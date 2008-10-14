@@ -11,7 +11,7 @@
 
   * Download the [http://deeptorch.googlecode.com/files/Torch_diff_current_release.tar.gz Torch3 diff] archive, which contains the modifications that we made to the Torch 3.1 release in order to accommodate our code. 
   * Uncompress it in your Torch3 folder and overwrite the files.
-  * Download [http://deeptorch.googlecode.com/files/deepTorch.tar.gz deepTorch_current_release.tar.gz deepTorch], install it in your Torch3 folder and modify the configuration file to add the `deepTorch` package to your list of packages.
+  * Download [http://deeptorch.googlecode.com/files/deepTorch_current_release.tar.gz deepTorch], install it in your Torch3 folder and modify the configuration file to add the `deepTorch` package to your list of packages.
 
 
 
