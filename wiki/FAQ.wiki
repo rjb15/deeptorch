@@ -1,5 +1,13 @@
 #summary Frequently Asked Questions.
 
-  * _What's the difference between an auto-encoder and an auto-associator?_ We use these terms interchangeably
-  * _Is this a Torch implementation of Deep Belief Networks (by Geoff Hinton et al.)?_ No
-  * _Is an auto-encoder basically the same thing as a Restricted Boltzmann Machine?_ No
+|| _What's the difference between an auto-encoder and an auto-associator?_ || 
+
+We use these terms interchangeably 
+
+|| _Is this a Torch implementation of Deep Belief Networks (by Geoff Hinton et al.)?_ ||
+
+No 
+
+|| _Is an auto-encoder basically the same thing as a Restricted Boltzmann Machine?_ ||  
+
+No
