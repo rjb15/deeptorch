@@ -19,4 +19,4 @@ This is where the similarities end. An auto-encoder is trained using a backprop 
   * [http://www-etud.iro.umontreal.ca/~manzagop Pierre-Antoine Manzagol] (University of Montreal)
   * [http://dumitru.erhan.googlepages.com Dumitru Erhan] (University of Montreal)
   * [http://bengio.abracadoudou.com/ Samy Bengio] (Google Inc.)
-  * [http://www.iro.umontreal.ca/~manzagop Yoshua Bengio] (University of Montreal)
+  * [http://www.iro.umontreal.ca/~bengioy Yoshua Bengio] (University of Montreal)
