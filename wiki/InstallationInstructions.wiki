@@ -6,6 +6,7 @@
   * Download the [http://deeptorch.googlecode.com/files/Torch_and_deepTorch_current_release.tar.gz archive] containing Torch3 and deepTorch source code.
   * Read carefully the Torch3 installation [http://www.torch.ch/documentation.php instructions]
   * Modify the provided `Linux.cfg` configuration file to add the packages from torch that you need (including `deepTorch`, presumably).
+  * Run `xmake` as per the Torch3 installation instructions.
 
 = If you have a working installation of Torch3 = 
 
@@ -13,5 +14,7 @@
   * Uncompress it in your Torch3 folder and overwrite the files.
   * Download [http://deeptorch.googlecode.com/files/deepTorch_current_release.tar.gz deepTorch], install it in your Torch3 folder and modify the configuration file to add the `deepTorch` package to your list of packages.
 
+= In both cases = 
 
-
+  * You should compile one of the files in deepTorch/mains and execute it. You will need to specify 3 files containing the training, validation and test data as well as several required hyperparameters (number of hidden units, for instance). 
+  * If the package is installed correctly, the program should run successfully and will create a directory whose name contains the list oif parameters and their values. Inside the directory, there will be several files containing various values measured during the execution (classification errors, reconstruction errors, etc).
