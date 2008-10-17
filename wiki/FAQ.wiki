@@ -11,3 +11,10 @@ No
 || _Is an auto-encoder basically the same thing as a Restricted Boltzmann Machine?_ ||  
 
 No
+
+|| _Who's behind this project?_ ||
+
+  * Pierre-Antoine Manzagol (University of Montreal)
+  * Dumitru Erhan (University of Montreal)
+  * Samy Bengio (Google Inc.)
+  * Yoshua Bengio (University of Montreal)
