@@ -1,0 +1,7 @@
+#summary Explain in words, diagrams and equations what we're doing
+
+= Introduction =
+
+Link to Yoshua's idea about Collective Learning
+
+= Details =
