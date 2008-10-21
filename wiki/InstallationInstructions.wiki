@@ -10,7 +10,7 @@
 
 = If you have a working installation of Torch3 = 
 
-  * Download the [http://deeptorch.googlecode.com/files/patchfile Torch3 patch file], which contains the modifications that we made to the [http://www.torch.ch/downloads.php Torch 3.1] release in order to accommodate our code 
+  * Download the [http://deeptorch.googlecode.com/files/patchfile Torch3 patch file], which contains the modifications that we made to the [http://www.torch.ch/downloads.php Torch 3.1] release in order to accommodate our code. This patch file was generated using `diff -ur new_torch_folder old_torch_folder`
   * ChangesToTorch describes these changes.
   * Copy it in your Torch3 folder and `cd` to it.
   * Run `patch -p1 < patchfile`. `patch` might complain, just say `y` instead of `n`.
