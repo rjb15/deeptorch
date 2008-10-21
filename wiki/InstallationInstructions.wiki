@@ -10,7 +10,7 @@
 
 = If you have a working installation of Torch3 = 
 
-  * Download the [http://deeptorch.googlecode.com/files/patchfile Torch3 patch file], which contains the modifications that we made to the Torch 3.1 release in order to accommodate our code. 
+  * Download the [http://deeptorch.googlecode.com/files/patchfile Torch3 patch file], which contains the modifications that we made to the [http://www.torch.ch/downloads.php Torch 3.1] release in order to accommodate our code (ChangesToTorch). 
   * Copy it in your Torch3 folder and `cd` to it.
   * Run `patch -p1 < patchfile`. `patch` might complain, just say `y` instead of `n`.
   * Download [http://deeptorch.googlecode.com/files/deepTorch_current_release.tar.gz deepTorch], unpack it in your Torch3 folder and modify the configuration file specific to your system (`Linux.cfg` or etc.) to add the `deepTorch` package to the list of packages.
