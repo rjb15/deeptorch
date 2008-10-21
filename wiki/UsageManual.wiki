@@ -1,4 +1,4 @@
-#summary How to use deepTorch in order to rule the world.
+#summary How to use deeptorch in order to rule the world.
 
 = Introduction =
 
