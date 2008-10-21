@@ -84,10 +84,12 @@ int main(int argc, char **argv)
   real flag_corrupt_value;
 
   // --- Training ---
+  int flag_max_iter_lwu;
   int flag_max_iter_uc;
   int flag_max_iter_ac;
   int flag_max_iter_sc;
   real flag_accuracy;
+  real flag_lr_lwu;
   real flag_lr_unsup;
   real flag_lr_supunsup;
   real flag_lr_sup;
@@ -128,8 +130,8 @@ int main(int argc, char **argv)
   // Model
   cmd.addText("\nModel options:");
   cmd.addICmdOption("-n_layers", &flag_n_layers, 2, "number of hidden layers", true);
-  cmd.addICmdOption("-n_hidden_units", &flag_n_hidden_units, 50, "number of hidden units on each hidden layer", true);
-  cmd.addICmdOption("-n_speech", &flag_n_speech, 10, "number of speech units on each communicating layer", true);
+  cmd.addICmdOption("-n_hidden_units", &flag_n_hidden_units, 5, "number of hidden units on each hidden layer", true);
+  cmd.addICmdOption("-n_speech", &flag_n_speech, 5, "number of speech units on each communicating layer", true);
   cmd.addBCmdOption("-tied_weights", &flag_tied_weights, false, "wether autoencoder weights are tied", true);
   cmd.addSCmdOption("-nonlinearity", &flag_nonlinearity, "sigmoid", "type of the nonlinearity (sigmoid, tanh, nonlinear)", true);
   cmd.addSCmdOption("-recons_cost", &flag_recons_cost, "xentropy", "which cost to use for reconstruction", true);
@@ -138,10 +140,12 @@ int main(int argc, char **argv)
 
   // Training
   cmd.addText("\nTraining options:");
-  cmd.addICmdOption("-max_iter_uc", &flag_max_iter_uc, 2, "max number of iterations with the unsupervised costs (1st phase)", true);
-  cmd.addICmdOption("-max_iter_ac", &flag_max_iter_ac, 2, "max number of iterations with all the costs (2nd phase)", true);
-  cmd.addICmdOption("-max_iter_sc", &flag_max_iter_sc, 2, "max number of iterations with only supervised cost (3rd phase)", true);
+  cmd.addICmdOption("-max_iter_lwu", &flag_max_iter_lwu, 2, "max number of iterations with the layerwise unsupervised costs (1st phase)", true);
+  cmd.addICmdOption("-max_iter_uc", &flag_max_iter_uc, 2, "max number of iterations with the unsupervised costs (2nd phase)", true);
+  cmd.addICmdOption("-max_iter_ac", &flag_max_iter_ac, 2, "max number of iterations with all the costs (3rd phase)", true);
+  cmd.addICmdOption("-max_iter_sc", &flag_max_iter_sc, 2, "max number of iterations with only supervised cost (4th phase)", true);
   cmd.addRCmdOption("-accuracy", &flag_accuracy, 1e-5, "end accuracy", true);
+  cmd.addRCmdOption("-lr_lwu", &flag_lr_lwu, 1e-3, "learning rate layerwise unsup phase", true);
   cmd.addRCmdOption("-lr_unsup", &flag_lr_unsup, 1e-3, "learning rate unsup phase", true);
   cmd.addRCmdOption("-lr_supunsup", &flag_lr_supunsup, 1e-3, "learning rate sup unsup phase", true);
   cmd.addRCmdOption("-lr_sup", &flag_lr_sup, 1e-3, "learning rate sup phase", true);
@@ -155,8 +159,8 @@ int main(int argc, char **argv)
   cmd.addBCmdOption("-profile_gradients", &flag_profile_gradients, false, "if true, profile the gradients", true);
 
   // Stuff
-  cmd.addICmdOption("start_seed", &flag_start_seed, 111, "the random seed used in the beginning (-1 to for random seed)", true);
-  cmd.addICmdOption("model_seed", &flag_model_seed, 222, "the random seed used just before model initialization (-1 to for random seed)", true);
+  cmd.addICmdOption("start_seed", &flag_start_seed, 1, "the random seed used in the beginning (-1 to for random seed)", true);
+  cmd.addICmdOption("model_seed", &flag_model_seed, 2, "the random seed used just before model initialization (-1 to for random seed)", true);
   cmd.addICmdOption("max_load", &flag_max_load, -1, "max number of examples to load for train", true);
   cmd.addBCmdOption("binary_mode", &flag_binary_mode, false, "binary mode for files", true);
   cmd.addBCmdOption("save_model", &flag_save_model, true, "if true, save the model", true);
@@ -190,16 +194,17 @@ int main(int argc, char **argv)
   std::stringstream ss;
   ss << flag_expdir_prefix << "csae-task=" << flag_task << "-nl=" << flag_n_layers
      << "-nhu=" << flag_n_hidden_units
-     << "-tied=" << flag_tied_weights << "-nonlin=" << flag_nonlinearity << "-recost=" << flag_recons_cost
-     << "-nspch=" << flag_n_speech << "-cprob=" << flag_corrupt_prob
-     << "-cval=" << flag_corrupt_value  << "-uepoch=" << flag_max_iter_uc
-     << "-acepoch=" << flag_max_iter_ac << "-scepoch=" << flag_max_iter_sc
+     << "-tied=" << flag_tied_weights << "-nlin=" << flag_nonlinearity << "-recost=" << flag_recons_cost
+     << "-ns=" << flag_n_speech << "-cprob=" << flag_corrupt_prob
+     << "-cval=" << flag_corrupt_value  << "-lwe=" << flag_max_iter_lwu << "-ue=" << flag_max_iter_uc
+     << "-ace=" << flag_max_iter_ac << "-sce=" << flag_max_iter_sc
+     << "-lwu=" << flag_lr_lwu 
      << "-lru=" << flag_lr_unsup << "-lrsu=" << flag_lr_supunsup << "-lrs=" << flag_lr_sup
      << "-dc=" << flag_lrate_decay << "-l1=" << flag_l1_decay
      << "-l2=" << flag_l2_decay << "-bdk=" << flag_bias_decay
      << "-uw=" << flag_unsup_weight
-     << "-ecw=" << flag_eval_criter_weights << "-cAvgFs=" << flag_criter_avg_framesize
-     << "-ss=" << flag_start_seed << "-mods=" << flag_model_seed << "/";
+     << "-ecw=" << flag_eval_criter_weights << "-cFs=" << flag_criter_avg_framesize
+     << "-ss=" << flag_start_seed << "-ms=" << flag_model_seed << "/";
   std::string expdir = ss.str();
 
   if (!flag_single_results_file)        {
@@ -254,10 +259,11 @@ int main(int argc, char **argv)
     Random::seed();
   else
     Random::manualSeed((long)flag_model_seed);
-
+  
+  // Last two parameters: communication type and n_communication_layers
   CommunicatingStackedAutoencoder csae("csae", flag_nonlinearity, flag_tied_weights, flag_n_inputs, flag_n_layers,
                                          units_per_hidden_layer, flag_n_classes,
-                                         is_noisy, units_per_speech_layer);
+                                         is_noisy, units_per_speech_layer,0,1);
   csae.setL1WeightDecay(flag_l1_decay);
   csae.setL2WeightDecay(flag_l2_decay);
   csae.setBiasDecay(flag_bias_decay);
@@ -316,6 +322,20 @@ int main(int argc, char **argv)
     system(command.c_str());
 
     csae_trainer.ProfileGradientsInitialize();
+  }
+
+  // --- train using the layerwise unsupervised criterions ---
+  if(flag_max_iter_lwu) {
+    csae_trainer.setROption("learning rate", flag_lr_lwu);
+    csae_trainer.setIOption("max iter", flag_max_iter_lwu);
+ 
+    if (flag_single_results_file) {
+      resultsfile = InitResultsFile(allocator,expdir,"lwunsup");
+      csae_trainer.resultsfile = resultsfile;
+    }
+
+    csae_trainer.TrainUnsupLayerwise();
+
   }
 
   // --- train using the unsupervised criterions ---

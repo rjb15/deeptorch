@@ -75,9 +75,12 @@ CommunicatingSaePairTrainer::CommunicatingSaePairTrainer(std::string expdir_, in
 
 }
 
+
 // first_csae, second_csae must be set. first_csae is mentor, second_csae is student.
 // second_sup_criterion must be set. first_sup_criterion is ignored.
-void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, MeasurerList *student_measurers)
+void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, MeasurerList *student_measurers,
+                                                 int n_communication_layers, real the_unsup_criterions_weight,
+                                                 real the_communication_weight)
 {
 
   std::stringstream ss;
@@ -93,26 +96,26 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
 
   if(communication_type==2)     {
     // Set the right targets for the Agreement datasets
-    for(int i=0; i<first_csae->n_hidden_layers; i++)    {
+    for(int i=0; i<n_communication_layers; i++)    {
       first_comAgree_datasets[i]->targets = second_csae->speakers[i]->outputs;
     }
 
     // Make an array with the criterions
-    mentor_criterions = (Criterion**) allocator->alloc(sizeof(Criterion *)*(2*first_csae->n_hidden_layers));
+    mentor_criterions = (Criterion**) allocator->alloc(sizeof(Criterion *)*(2*n_communication_layers));
 
-    for(int i=0; i<first_csae->n_hidden_layers; i++)    {
+    for(int i=0; i<n_communication_layers; i++)    {
       mentor_criterions[i] = first_comAgree_criterions[i];
-      mentor_criterions[first_csae->n_hidden_layers+i] = first_comContent_criterions[i];
+      mentor_criterions[n_communication_layers+i] = first_comContent_criterions[i];
     }
 
     // Create the concat criterion.
     mentor_concat_criterion = new(allocator) ConcatCriterion(first_csae->mentor->n_outputs,
-                                                            2*first_csae->n_hidden_layers,
+                                                            2*n_communication_layers,
                                                             mentor_criterions);
 
     // Measurers
     mentor_measurers = (MeasurerList*) new(allocator) MeasurerList();
-    for(int i=0; i<first_csae->n_hidden_layers; i++)    {
+    for(int i=0; i<n_communication_layers; i++)    {
       FakeDataMeasurer *faker_agree = new(allocator) FakeDataMeasurer(first_unsup_datasets[0],
                                                                 first_comAgree_measurers[i]);
       mentor_measurers->addNode(faker_agree);
@@ -127,6 +130,12 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
   Criterion **student_criterions = NULL;
   MeasurerList *student_measurers_all = (MeasurerList*) new(allocator) MeasurerList();
 
+  // Weights for weighing different criterions. First criterion, the supervised
+  // cost, has weight 1.0. The unsupervised criterions have a weight of
+  // the_unsup_criterions_weights, while the communication and agreement
+  // criterions have a weight of the_communication_weight. 
+  real *criterions_weights;
+ 
   for(int i=0; i<student_measurers->n_nodes; i++)       {
     if(student_measurers->nodes[i]->data == sup_train_data)     {
       FakeDataMeasurer *faker = new(allocator) FakeDataMeasurer(second_unsup_datasets[0],
@@ -141,29 +150,37 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
   if(communication_type==0 || communication_type==1)     {
 
     // Set the right targets for the Agreement datasets
-    for(int i=0; i<first_csae->n_hidden_layers; i++)    {
+    for(int i=0; i<n_communication_layers; i++)    {
       second_comAgree_datasets[i]->targets = first_csae->encoders[i]->outputs;
     }
 
     // Make an array with the criterions
-    student_criterions = (Criterion **) allocator->alloc(sizeof(Criterion*)*(1+2*second_csae->n_hidden_layers));
+    student_criterions = (Criterion **) allocator->alloc(sizeof(Criterion*)*(1+second_csae->n_hidden_layers+n_communication_layers));
+
+    criterions_weights = (real*) allocator->alloc(sizeof(real)*(n_communication_layers+second_csae->n_hidden_layers+1));
+    criterions_weights[0] = 1.0;
 
     student_criterions[0] = second_sup_criterion;
     for(int i=0; i<second_csae->n_hidden_layers; i++)    {
       student_criterions[1+i] = second_unsup_criterions[i];
+      criterions_weights[1+i] = the_unsup_criterions_weight;
+    }
+
+    for(int i=0; i<n_communication_layers; i++)    {
       student_criterions[1+second_csae->n_hidden_layers+i] = second_comAgree_criterions[i];
+      criterions_weights[1+second_csae->n_hidden_layers+i] = the_communication_weight;
     }
 
     // Create the concat criterion.
     if(communication_type==0)   {
       student_concat_criterion = new(allocator) ConcatCriterion(second_csae->sup_unsup_comA_machine->n_outputs,
-                                                 1+2*second_csae->n_hidden_layers,
-                                                 student_criterions);
+                                                 1+second_csae->n_hidden_layers+n_communication_layers,
+                                                 student_criterions,criterions_weights);
     }
     else        {
       student_concat_criterion = new(allocator) ConcatCriterion(second_csae->sup_unsup_comB_machine->n_outputs,
-                                                 1+2*second_csae->n_hidden_layers,
-                                                 student_criterions);
+                                                 1+second_csae->n_hidden_layers+n_communication_layers,
+                                                 student_criterions, criterions_weights);
     }
 
     // Measurers
@@ -172,6 +189,9 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
       FakeDataMeasurer *faker_unsup = new(allocator) FakeDataMeasurer(second_unsup_datasets[0],
                                                                       second_unsup_measurers[i]);
       student_measurers_all->addNode(faker_unsup);
+    }
+ 
+    for(int i=0; i<n_communication_layers; i++)    {
       // agreement
       FakeDataMeasurer *faker_agree = new(allocator) FakeDataMeasurer(second_unsup_datasets[0],
                                                                 second_comAgree_measurers[i]);
@@ -181,23 +201,31 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
   // --- Both agreement and usefulness
   else  {
     // Set the right targets for the Agreement datasets
-    for(int i=0; i<first_csae->n_hidden_layers; i++)    {
+    for(int i=0; i<n_communication_layers; i++)    {
       second_comAgree_datasets[i]->targets = first_csae->speakers[i]->outputs;
     }
 
     // Make an array with the criterions
-    student_criterions = (Criterion **) allocator->alloc(sizeof(Criterion*)*(1+3*second_csae->n_hidden_layers));
+    student_criterions = (Criterion **) allocator->alloc(sizeof(Criterion*)*(1+second_csae->n_hidden_layers+2*n_communication_layers));
+    criterions_weights = (real*) allocator->alloc(sizeof(real)*(1+second_csae->n_hidden_layers+2*n_communication_layers));
+    criterions_weights[0] = 1.0;
 
     student_criterions[0] = second_sup_criterion;
     for(int i=0; i<second_csae->n_hidden_layers; i++)    {
       student_criterions[1+i] = second_unsup_criterions[i];
+      criterions_weights[1+i] = the_unsup_criterions_weight;
+    }
+    for(int i=0; i<n_communication_layers; i++)    {
       student_criterions[1+second_csae->n_hidden_layers+i] = second_comAgree_criterions[i];
-      student_criterions[1+2*second_csae->n_hidden_layers+i] = second_comContent_criterions[i];
+      student_criterions[1+second_csae->n_hidden_layers+n_communication_layers+i] = second_comContent_criterions[i];
+      // The agreement and communication criteria will have the same weight
+      criterions_weights[1+second_csae->n_hidden_layers+i] = the_communication_weight;
+      criterions_weights[1+second_csae->n_hidden_layers+n_communication_layers+i] = the_communication_weight;
     }
 
     // Create the concat criterion.
     student_concat_criterion = new(allocator) ConcatCriterion(second_csae->sup_unsup_comC_machine->n_outputs,
-                                                             1+3*second_csae->n_hidden_layers,
+                                                             1+second_csae->n_hidden_layers+2*n_communication_layers,
                                                              student_criterions);
 
     // Measurers
@@ -206,6 +234,8 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
       FakeDataMeasurer *faker_unsup = new(allocator) FakeDataMeasurer(second_unsup_datasets[0],
                                                                       second_unsup_measurers[i]);
       student_measurers_all->addNode(faker_unsup);
+    }
+    for(int i=0; i<n_communication_layers; i++)    {
       // agreement
       FakeDataMeasurer *faker_agree = new(allocator) FakeDataMeasurer(second_unsup_datasets[0],
                                                                       second_comAgree_measurers[i]);
@@ -226,13 +256,18 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
   int *shuffle = (int *)Allocator::sysAlloc(n_train*sizeof(int));
 
   // data??
-  first_csae->mentor->setDataSet(sup_train_data);
-  if(communication_type==0)
+  if(communication_type==0) {
+    first_csae->setDataSet(sup_train_data);
     second_csae->sup_unsup_comA_machine->setDataSet(sup_train_data);
-  else if(communication_type==1)
+  }
+  else if(communication_type==1)        {
+    first_csae->setDataSet(sup_train_data);
     second_csae->sup_unsup_comB_machine->setDataSet(sup_train_data);
-  else
+  }
+  else {
+    first_csae->mentor->setDataSet(sup_train_data);
     second_csae->sup_unsup_comC_machine->setDataSet(sup_train_data);
+  }
 
   // the unsupervised criterions have their datasets set.
   // first_sup_criterion is not used
@@ -293,9 +328,11 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
   while(1)      {
     // Prepare for iteration (epoch)
     if(communication_type==0)   {
+      first_csae->iterInitialize();
       second_csae->sup_unsup_comA_machine->iterInitialize();
     }
     else if(communication_type==1)      {
+      first_csae->iterInitialize();
       second_csae->sup_unsup_comB_machine->iterInitialize();
     }
     else      {
@@ -313,10 +350,12 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
     for(int t = 0; t < n_train; t++)    {
 
       // - Set derivatives to zero -
-      if(communication_type==0)
+      if(communication_type==0) {
         ClearDerivatives(second_csae->sup_unsup_comA_machine);
-      else if(communication_type==1)
+      }
+      else if(communication_type==1)    {
         ClearDerivatives(second_csae->sup_unsup_comB_machine);
+      }
       else      {
         ClearDerivatives(first_csae->mentor_communicator);        // WASTED COMPUTATIONS! We won't bprop to all these.
         ClearDerivatives(second_csae->sup_unsup_comC_machine);
@@ -329,10 +368,12 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
 
       // - fprop -
       if(communication_type==0) {
+        first_csae->forward(sup_train_data->inputs);
         second_csae->sup_unsup_comA_machine->forward(sup_train_data->inputs);
         student_concat_criterion->forward(second_csae->sup_unsup_comA_machine->outputs);
       }
       else if(communication_type==1)    {
+        first_csae->forward(sup_train_data->inputs);
         second_csae->sup_unsup_comB_machine->forward(sup_train_data->inputs);
         student_concat_criterion->forward(second_csae->sup_unsup_comB_machine->outputs);
       }
@@ -432,6 +473,28 @@ void CommunicatingSaePairTrainer::trainMentoring(DataSet *sup_train_data, Measur
         second_meas[julie][i]->measureIteration();
     }
 
+    if (resultsfile) {
+      // Writing all the errors to a results files. Assumes 
+      // - that each used measurer has a filed called "current_error" 
+      // (which is the case for most standard measurers which return
+      // a single real as a result
+      // - that current_error is a real
+      real current_meas_err = 0.;
+      for(int d = 0; d < first_n_datas; d++)  {
+         for(int i = 0; i < first_n_meas[d]; i++) {
+           current_meas_err = first_meas[d][i]->current_error;
+           resultsfile->printf("%g ",current_meas_err);
+         }
+      }
+      for(int d = 0; d < second_n_datas; d++)  {
+         for(int i = 0; i < second_n_meas[d]; i++) {
+           current_meas_err = second_meas[d][i]->current_error;
+           resultsfile->printf("%g ",current_meas_err);
+         }
+      }
+      resultsfile->printf("\n");
+      resultsfile->flush();
+    }
 
     // Prepare for next iteration (if there is a next one).
     print(".");

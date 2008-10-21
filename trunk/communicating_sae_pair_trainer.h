@@ -81,7 +81,9 @@ class CommunicatingSaePairTrainer : public StochasticGradientPlus
                                 bool profile_local_gradients_, XFile* resultsfile_=NULL);
 
     virtual void train(DataSet *data, MeasurerList *measurers);
-    virtual void trainMentoring(DataSet *sup_train_data, MeasurerList *student_measurers);
+    virtual void trainMentoring(DataSet *sup_train_data, MeasurerList *student_measurers, 
+                                int n_communication_layers, real the_unsup_criterions_weight,
+                                real the_communication_weight);
 
     // This is not the right place for this function. It should go in
     // GradientMachine of course.

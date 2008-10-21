@@ -26,7 +26,7 @@ namespace Torch {
 // * communication 0: make the student and mentor's units be close.
 // * communication 1: the student uses a coder to try and rebuild the mentor's
 // hidden units.
-// * communication 3: the student and the mentor both have a coder to produce a
+// * communication 2: the student and the mentor both have a coder to produce a
 // language. Make them agree on what they say about examples and have what they
 // say be useful for reconstructing the hidden units.
 //
@@ -34,6 +34,7 @@ class CommunicatingStackedAutoencoder : public StackedAutoencoder
 {
   public:
     int communication_type;
+    int n_communication_layers;
     int *n_speech_units;
 
     Identity** hidden_handles;  // these serve as handles to the hidden layers.
@@ -75,11 +76,12 @@ class CommunicatingStackedAutoencoder : public StackedAutoencoder
                                     int n_outputs_,
                                     bool is_noisy_,
                                     int *n_speech_units_,
-                                    int communication_type_=3);
+                                    int communication_type,
+                                    int n_communication_layers);
 
     // Adds (and connects) a communication machine to machine. Layer determines
     // the layer at which the communication takes place.
-    virtual void AddCommunicationMachines(ConnectedMachine *mch);
+    virtual void AddComCMachines(ConnectedMachine *mch);
     virtual void AddMachines(ConnectedMachine *mch, GradientMachine **addees,
                              GradientMachine **connectees);
 
