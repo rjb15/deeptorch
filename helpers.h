@@ -72,7 +72,8 @@ void BuildSaeComAgreeDatasetsCriteriaMeasurers(Allocator *allocator,
                                           DataSet **agree_datasets,
                                           Criterion **agree_criterions,
                                           Measurer **agree_measurers,
-                                          bool disk_results);
+                                          bool disk_results,
+                                          int n_communication_layers);
 
 void BuildSaeComContentDatasetsCriteriaMeasurers(Allocator *allocator,
                                           std::string expdir,
@@ -84,7 +85,8 @@ void BuildSaeComContentDatasetsCriteriaMeasurers(Allocator *allocator,
                                           DataSet **content_datasets,
                                           Criterion **content_criterions,
                                           Measurer **content_measurers,
-                                          bool disk_results);
+                                          bool disk_results,
+                                          int n_communication_layers);
 
 
 

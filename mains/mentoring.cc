@@ -95,6 +95,7 @@ int main(int argc, char **argv)
 
   // --- Training ---
   int flag_communication_type;
+  int flag_n_communication_layers;
   int flag_max_iter_ac;
   int flag_max_iter_sc;
   real flag_accuracy;
@@ -106,6 +107,7 @@ int main(int argc, char **argv)
   real flag_l2_decay;
   real flag_bias_decay;
   real flag_unsup_weight;
+  real flag_com_weight;
   bool flag_criter_avg_framesize;
   bool flag_profile_gradients;
 
@@ -138,8 +140,8 @@ int main(int argc, char **argv)
   // --- Model ---
   cmd.addText("\nModel options:");
   cmd.addICmdOption("-n_layers", &flag_n_layers, 2, "number of hidden layers", true);
-  cmd.addICmdOption("-n_hidden_units", &flag_n_hidden_units, 50, "number of hidden units on each hidden layer", true);
-  cmd.addICmdOption("-n_speech", &flag_n_speech, 10, "number of speech units on each communicating layer", true);
+  cmd.addICmdOption("-n_hidden_units", &flag_n_hidden_units, 5, "number of hidden units on each hidden layer", true);
+  cmd.addICmdOption("-n_speech", &flag_n_speech, 5, "number of speech units on each communicating layer", true);
   cmd.addBCmdOption("-tied_weights", &flag_tied_weights, false, "wether autoencoder weights are tied", true);
   cmd.addSCmdOption("-nonlinearity", &flag_nonlinearity, "sigmoid", "type of the nonlinearity (sigmoid, tanh, nonlinear)", true);
   cmd.addSCmdOption("-recons_cost", &flag_recons_cost, "xentropy", "which cost to use for reconstruction", true);
@@ -149,6 +151,7 @@ int main(int argc, char **argv)
   // Training
   cmd.addText("\nTraining options:");
   cmd.addICmdOption("-communication_type",&flag_communication_type, 2, "0: no speech, student hu track mentor hu. 1: student has speech that tracks mentor hu, 2: student and mentor have speech (agree and content costs for both)");
+  cmd.addICmdOption("-n_communication_layers",&flag_n_communication_layers, 2, "Number of layers (from the bottom hidden layer) at which communication is being performed");
   cmd.addICmdOption("-max_iter_ac", &flag_max_iter_ac, 2, "max number of iterations with all the costs", true);
   cmd.addICmdOption("-max_iter_sc", &flag_max_iter_sc, 2, "max number of iterations with only supervised cost", true);
   cmd.addRCmdOption("-accuracy", &flag_accuracy, 1e-5, "end accuracy", true);
@@ -160,6 +163,7 @@ int main(int argc, char **argv)
   cmd.addRCmdOption("-l2_decay", &flag_l2_decay, 0.0, "l2 weight decay", true);
   cmd.addRCmdOption("-bias_decay", &flag_bias_decay, 0.0, "bias decay", true);
   cmd.addRCmdOption("-unsup_weight", &flag_unsup_weight, 1.0, "multiplicative weight to give to the unsupervised costs.", true);
+  cmd.addRCmdOption("-com_weight", &flag_com_weight, 1.0, "multiplicative weight to give to the communication costs.", true);
   //cmd.addBCmdOption("-eval_criter_weights", &flag_eval_criter_weights, false, "if true, weigh the criterions based on hessian-based magic.", true);
   cmd.addBCmdOption("-criter_avg_framesize", &flag_criter_avg_framesize, false, "if true, costs of unsup criterions are divided by number of inputs", true);
   cmd.addBCmdOption("-profile_gradients", &flag_profile_gradients, false, "if true, profile the gradients", true);
@@ -205,6 +209,7 @@ int main(int argc, char **argv)
      << "-tied=" << flag_tied_weights << "-nonlin=" << flag_nonlinearity << "-recost=" << flag_recons_cost
      << "-nspch=" << flag_n_speech << "-cprob=" << flag_corrupt_prob
      << "-cval=" << flag_corrupt_value << "-com=" << flag_communication_type
+     << "-flcom=" << flag_n_communication_layers
      << "-acepoch=" << flag_max_iter_ac << "-scepoch=" << flag_max_iter_sc
      << "-mentor_lr=" << flag_mentor_lrate << "-mentor_dc=" << flag_mentor_lrate_decay
      << "-lr=" << flag_lrate << "-dc=" << flag_lrate_decay << "-l1=" << flag_l1_decay
@@ -265,7 +270,8 @@ int main(int argc, char **argv)
     Random::manualSeed((long)flag_mentor_seed);
   CommunicatingStackedAutoencoder mentor("mentor", flag_nonlinearity, flag_tied_weights, flag_n_inputs, flag_n_layers,
                                          units_per_hidden_layer, flag_n_classes,
-                                         is_noisy, units_per_speech_layer);
+                                         is_noisy, units_per_speech_layer, flag_communication_type,
+                                         flag_n_communication_layers);
 
   mentor.setL1WeightDecay(flag_l1_decay);
   mentor.setL2WeightDecay(flag_l2_decay);
@@ -279,7 +285,8 @@ int main(int argc, char **argv)
     Random::manualSeed((long)flag_student_seed);
   CommunicatingStackedAutoencoder student("student", flag_nonlinearity, flag_tied_weights, flag_n_inputs, flag_n_layers,
                                           units_per_hidden_layer, flag_n_classes,
-                                          is_noisy, units_per_speech_layer);
+                                          is_noisy, units_per_speech_layer, flag_communication_type,
+                                          flag_n_communication_layers);
   student.setL1WeightDecay(flag_l1_decay);
   student.setL2WeightDecay(flag_l2_decay);
   student.setDestructionOptions(flag_corrupt_prob, flag_corrupt_value);
@@ -340,25 +347,25 @@ int main(int argc, char **argv)
   Measurer **mentor_comContent_measurers = NULL;
 
   if(flag_communication_type==2)     {
-    mentor_comAgree_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*flag_n_layers);
-    mentor_comAgree_criterions = (Criterion**) allocator->alloc(sizeof(Criterion*)*flag_n_layers);
-    mentor_comAgree_measurers = (Measurer**) allocator->alloc(sizeof(Measurer*)*flag_n_layers);
+    mentor_comAgree_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*flag_n_communication_layers);
+    mentor_comAgree_criterions = (Criterion**) allocator->alloc(sizeof(Criterion*)*flag_n_communication_layers);
+    mentor_comAgree_measurers = (Measurer**) allocator->alloc(sizeof(Measurer*)*flag_n_communication_layers);
 
-    mentor_comContent_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*flag_n_layers);
-    mentor_comContent_criterions = (Criterion**) allocator->alloc(sizeof(Criterion*)*flag_n_layers);
-    mentor_comContent_measurers = (Measurer**) allocator->alloc(sizeof(Measurer*)*flag_n_layers);
+    mentor_comContent_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*flag_n_communication_layers);
+    mentor_comContent_criterions = (Criterion**) allocator->alloc(sizeof(Criterion*)*flag_n_communication_layers);
+    mentor_comContent_measurers = (Measurer**) allocator->alloc(sizeof(Measurer*)*flag_n_communication_layers);
 
     BuildSaeComAgreeDatasetsCriteriaMeasurers(allocator, expdir,
                             &mentor, &train_data, &mentor_supervised_criterion, flag_recons_cost, flag_communication_type,
                             flag_criter_avg_framesize,
                             mentor_comAgree_datasets, mentor_comAgree_criterions, mentor_comAgree_measurers,
-                            flag_multiple_results_files);
+                            flag_multiple_results_files, flag_n_communication_layers);
 
     BuildSaeComContentDatasetsCriteriaMeasurers(allocator, expdir,
                             &mentor, &train_data, &mentor_supervised_criterion, flag_recons_cost,
                             flag_criter_avg_framesize,
                             mentor_comContent_datasets, mentor_comContent_criterions, mentor_comContent_measurers,
-                            flag_multiple_results_files);
+                            flag_multiple_results_files, flag_n_communication_layers);
   }
 
   // *** Build student's datasets, criteria and measurers
@@ -370,26 +377,26 @@ int main(int argc, char **argv)
   Criterion **student_comContent_criterions = NULL;
   Measurer **student_comContent_measurers = NULL;
 
-  student_comAgree_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*flag_n_layers);
-  student_comAgree_criterions = (Criterion**) allocator->alloc(sizeof(Criterion*)*flag_n_layers);
-  student_comAgree_measurers = (Measurer**) allocator->alloc(sizeof(Measurer*)*flag_n_layers);
+  student_comAgree_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*flag_n_communication_layers);
+  student_comAgree_criterions = (Criterion**) allocator->alloc(sizeof(Criterion*)*flag_n_communication_layers);
+  student_comAgree_measurers = (Measurer**) allocator->alloc(sizeof(Measurer*)*flag_n_communication_layers);
 
   BuildSaeComAgreeDatasetsCriteriaMeasurers(allocator, expdir,
                                        &student, &train_data, &student_supervised_criterion, flag_recons_cost, flag_communication_type,
                                        flag_criter_avg_framesize,
                                        student_comAgree_datasets, student_comAgree_criterions, student_comAgree_measurers,
-                                       flag_multiple_results_files);
+                                       flag_multiple_results_files, flag_n_communication_layers);
 
   if(flag_communication_type>1)        {
-    student_comContent_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*flag_n_layers);
-    student_comContent_criterions = (Criterion**) allocator->alloc(sizeof(Criterion*)*flag_n_layers);
-    student_comContent_measurers = (Measurer**) allocator->alloc(sizeof(Measurer*)*flag_n_layers);
+    student_comContent_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*flag_n_communication_layers);
+    student_comContent_criterions = (Criterion**) allocator->alloc(sizeof(Criterion*)*flag_n_communication_layers);
+    student_comContent_measurers = (Measurer**) allocator->alloc(sizeof(Measurer*)*flag_n_communication_layers);
 
     BuildSaeComContentDatasetsCriteriaMeasurers(allocator, expdir,
                                        &student, &train_data, &student_supervised_criterion, flag_recons_cost,
                                        flag_criter_avg_framesize,
                                        student_comContent_datasets, student_comContent_criterions, student_comContent_measurers,
-                                       flag_multiple_results_files);
+                                       flag_multiple_results_files,flag_n_communication_layers);
   }
 
   // === Train the mentor ===
@@ -407,12 +414,17 @@ int main(int argc, char **argv)
   DiskXFile* resultsfile = NULL;
 
   if (flag_single_results_file) {
-      resultsfile = InitResultsFile(allocator,expdir,"mentor");
+      resultsfile = InitResultsFile(allocator,expdir,"mentor_supunsup");
       mentor_trainer.resultsfile = resultsfile;
   }
 
   // --- train using all individual criterions at once ---
   mentor_trainer.TrainSupUnsup(&train_data, &mentor_measurers, flag_unsup_weight);
+
+  if (flag_single_results_file) {
+      resultsfile = InitResultsFile(allocator,expdir,"mentor_sup");
+      mentor_trainer.resultsfile = resultsfile;
+  }
 
   mentor_trainer.setIOption("max iter", flag_max_iter_sc);
   warning("Make sure the supervised training does what you think it does. For example, the lr is reset undecayed!");
@@ -476,7 +488,7 @@ int main(int argc, char **argv)
      pair_trainer.resultsfile = resultsfile;
   }
   // *** Mentoring ***
-  pair_trainer.trainMentoring(&train_data, &student_measurers);
+  pair_trainer.trainMentoring(&train_data, &student_measurers, flag_n_communication_layers, flag_unsup_weight, flag_com_weight);
 
   // *** Supervised ***
   StackedAutoencoderTrainer student_trainer(&student, &student_supervised_criterion, expdir);

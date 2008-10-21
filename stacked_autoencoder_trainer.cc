@@ -59,6 +59,10 @@ StackedAutoencoderTrainer::StackedAutoencoderTrainer(StackedAutoencoder *machine
 
   criterions_weights = (real*) allocator->alloc(sizeof(real)*(sae->n_hidden_layers+1));
 
+  layerwise_training = false;
+  layerwise_layer = 0;
+  outputer_training = false;
+
   // Gradient profiling
   profile_gradients = false;
 
@@ -224,8 +228,26 @@ void StackedAutoencoderTrainer::IterFinalize()
 
 void StackedAutoencoderTrainer::fpropbprop(DataSet *data)
 {
-  if(!profile_gradients)
+  if(!profile_gradients && !layerwise_training && !outputer_training) {
     StochasticGradientPlus::fpropbprop(data);
+  }
+  else if(layerwise_training)   {
+    // forward the mesd
+    sae->mesd_machines[layerwise_layer]->forward(data->inputs);
+    criterion->forward(machine->outputs);
+
+    // backward only the autoencoder
+    criterion->backward(machine->outputs, NULL);
+    sae->autoencoders[layerwise_layer]->backward(data->inputs, criterion->beta);
+  }
+  else if(outputer_training)    {
+    machine->forward(data->inputs);
+    criterion->forward(machine->outputs);
+
+    // backward only the outputer
+    criterion->backward(machine->outputs, NULL);
+    sae->outputer->backward(data->inputs, criterion->beta);
+  }
   else  {
     machine->forward(data->inputs);
     criterion->forward(machine->outputs);
@@ -235,6 +257,63 @@ void StackedAutoencoderTrainer::fpropbprop(DataSet *data)
     //((GradientMachine *)machine)->backward(data->inputs, criterion->beta);
   }
 }
+
+// TODO set autoencoder to do partial bprop
+void StackedAutoencoderTrainer::TrainUnsupLayerwise()
+{
+
+  layerwise_training = true;
+
+  for(int i=0; i<sae->n_hidden_layers; i++)     {
+    layerwise_layer = i;
+    TrainUnsupLayer();
+  }
+
+  layerwise_training = false;
+}
+
+void StackedAutoencoderTrainer::TrainUnsupLayer()
+{
+  // Inform user of what's going on!
+  std::stringstream ss;
+  ss << sae->name << " : unsupervised training of layer " << layerwise_layer
+     << ". No bprop to lower layers.";
+  message(ss.str().c_str());
+
+  // This will be used by the train function: setData, iterInitialize,
+  // clearDerivatives and updateMachine. That's actually not ideal, as we only
+  // backward the autoencoder.
+  machine = sae->mesd_machines[layerwise_layer];
+  criterion = unsup_criterions[layerwise_layer];
+  MeasurerList the_measurers;
+  the_measurers.addNode(unsup_measurers[layerwise_layer]);
+
+  train(unsup_datasets[layerwise_layer], &the_measurers);
+
+  machine = sae;
+  criterion = sup_criterion;
+}
+
+// TODO set outputer to do partial bprop
+void StackedAutoencoderTrainer::TrainOutputLayer(DataSet *supervised_train_data,
+                                                 MeasurerList *measurers)
+{
+  // Inform user of the current stage
+  std::stringstream ss;
+  ss << sae->name << " : training output layer.";
+  message(ss.str().c_str());
+
+  outputer_training = true;
+
+  machine = sae;
+  criterion = sup_criterion;
+
+  train(supervised_train_data, measurers);
+
+  outputer_training = false;
+}
+
+//--------------
 
 void StackedAutoencoderTrainer::TrainUnsup(DataSet *supervised_train_data,
                                               MeasurerList *measurers)
@@ -325,93 +404,6 @@ void StackedAutoencoderTrainer::TrainSupUnsup(DataSet *supervised_train_data,
   criterion = sup_criterion;
 
 }
-
-// TODO - rewrite. The underlying inputs are not computed with the new code!
-/*void StackedAutoencoderTrainer::PreTrainHiddenLayer(DataSet *data, int layer)
-{
-  std::stringstream ss;
-  ss <<  sae->name << " : pre-training layer " << layer;
-  message(ss.str().c_str());
-
-  // Build the Data
-  DataSet *the_data;
-  if(layer!=0)  {
-
-    //Sequence** dynamic_targets = (Sequence**) allocator->alloc(sizeof(Sequence*));
-    //(*dynamic_targets) = sae->encoders[layer-1]->outputs;
-    //the_data = new(allocator) DynamicDataSet(data,
-    //                                         true,
-    //                                         false,
-    //                                         false,
-    //                                         0,
-    //                                         1,
-    //                                         NULL,
-    //                                         dynamic_targets);
-    the_data = new(allocator) DynamicDataSet(data, (Sequence*) NULL, sae->encoders[layer-1]->outputs);
-  }     else    {
-    the_data = new(allocator) InputAsTargetDataSet(data);
-  }
-
-  //the machine
-  ConnectedMachine* the_machine = sae->reconstructors[layer];
-
-  // Measurer and Criterion
-  reconstruction_measurers[layer]->data = the_data;
-  MeasurerList *measurers = new(allocator) MeasurerList();
-  measurers->addNode(reconstruction_measurers[layer]);
-
-//  DiskXFile *check_file = new(allocator) DiskXFile("check_recons.txt","w");
-//  Measurer * check_measurer = new(allocator) GradientCheckMeasurer(sae->, criterion, data, check_file);
-//  measurers.addNode(check_measurer);
-
-  // Trainer
-  StochasticGradient the_trainer(the_machine, reconstruction_criterions[layer]);
-  the_trainer.setROption("learning rate", reconstruction_learning_rate);
-  the_trainer.setROption("learning rate decay", learning_rate_decay);
-  the_trainer.setROption("end accuracy", end_accuracy);
-  the_trainer.setIOption("max iter", reconstruction_max_iter);
-  the_trainer.train(the_data, measurers);
-
-}
-
-// TODO - rewrite. The underlying inputs are not computed with the new code!
-void StackedAutoencoderTrainer::TrainOutputLayer(DataSet *data)
-{
-  std::stringstream ss;
-
-  // Inform user of the current stage
-  ss << sae->name << " : training output layer.";
-  message(ss.str().c_str());
-
-  // Build some default measurers
-  OneHotClassFormat class_format(data);
-  MeasurerList measurers;
-  ss.str("");
-  ss << "output/" << sae->name << "_outputer_nll.txt";
-  DiskXFile nll_err(ss.str().c_str(),"w");
-  ClassNLLMeasurer nll_meas(sae->outputer->outputs, data, &class_format, &nll_err);
-  measurers.addNode(&nll_meas);
-  ss.str("");
-  ss << "output/" << sae->name << "_outputer_class.txt";
-  DiskXFile class_err(ss.str().c_str(),"w");
-  ClassMeasurer class_meas(sae->outputer->outputs, data, &class_format, &class_err);
-  measurers.addNode(&class_meas);
-
-//  DiskXFile *check_file = new(allocator) DiskXFile("check_ouput.txt","w");
-//  Measurer * check_measurer = new(allocator) GradientCheckMeasurer(sae->outputer, criterion, data, check_file);
-//  measurers.addNode(check_measurer);
-
-  // Criterion - just use the standard one
-
-  // Set up a trainer and train
-  StochasticGradient outputer_trainer(sae->outputer, criterion);
-  outputer_trainer.setROption("learning rate", learning_rate);
-  outputer_trainer.setROption("learning rate decay", learning_rate_decay);
-  outputer_trainer.setROption("end accuracy", end_accuracy);
-  outputer_trainer.setIOption("max iter", max_iter);
-  outputer_trainer.train(data, &measurers);
-}
-*/
 
 
 void StackedAutoencoderTrainer::ProfileGradientsInitialize()

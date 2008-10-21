@@ -250,12 +250,13 @@ void BuildSaeComAgreeDatasetsCriteriaMeasurers(Allocator *allocator,
                                           DataSet **agree_datasets,
                                           Criterion **agree_criterions,
                                           Measurer **agree_measurers,
-                                          bool disk_results)
+                                          bool disk_results,
+                                          int n_communication_layers)
 {
   std::stringstream ss;
   XFile *file;
 
-  for(int i=0; i<csae->n_hidden_layers; i++) {
+  for(int i=0; i<n_communication_layers; i++) {
 
     ss.str("");
     ss.clear();
@@ -311,12 +312,13 @@ void BuildSaeComContentDatasetsCriteriaMeasurers(Allocator *allocator,
                                           DataSet **content_datasets,
                                           Criterion **content_criterions,
                                           Measurer **content_measurers,
-                                          bool disk_results)
+                                          bool disk_results,
+                                          int n_communication_layers)
 {
   std::stringstream ss;
   XFile *file;
 
-  for(int i=0; i<csae->n_hidden_layers; i++) {
+  for(int i=0; i<n_communication_layers; i++) {
     content_datasets[i] = new(allocator) DynamicDataSet(supervised_train_data, (Sequence*)NULL, csae->encoders[i]->outputs);
     content_criterions[i] = NewUnsupCriterion(allocator, recons_cost, csae->encoders[i]->n_outputs);
     content_criterions[i]->setBOption("average frame size", criterion_avg_frame_size);
@@ -360,6 +362,9 @@ void SaveCSAE(std::string expdir, int n_layers, int n_inputs, int *units_per_hid
   model_.taggedWrite(units_per_hidden_layer, sizeof(int), n_layers, "units_per_hidden_layer");
   model_.taggedWrite(units_per_speech_layer, sizeof(int), n_layers, "units_per_speech_layer");
   model_.taggedWrite(&tied_weights, sizeof(bool), 1, "tied_weights");
+  model_.taggedWrite(&csae->communication_type, sizeof(int), 1, "communication_type");
+  model_.taggedWrite(&csae->n_communication_layers, sizeof(int), 1, "n_communication_layers");
+
 
   int nonlinearity_integer;
   if(nonlinearity=="tanh")    {
@@ -403,6 +408,8 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
   std::string recons_cost;
   real corrupt_prob;
   real corrupt_value;
+  int communication_type;
+  int n_communication_layers;
   CommunicatingStackedAutoencoder *csae;
 
   XFile *m = new(allocator) DiskXFile(filename.c_str(), "r");
@@ -415,6 +422,9 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
   units_per_speech_layer = (int*)malloc(sizeof(int)*(n_layers));
   m->taggedRead(units_per_speech_layer, sizeof(int), n_layers, "units_per_speech_layer");
   m->taggedRead(&tied_weights, sizeof(bool), 1, "tied_weights");
+
+  m->taggedRead(&communication_type, sizeof(int), 1, "communication_type");
+  m->taggedRead(&n_communication_layers, sizeof(int), 1, "n_communication_layers");
 
   m->taggedRead(&nonlinearity_integer, sizeof(int), 1, "nonlinearity: 0 tanh, 1 sigmoid, 2 nonlinear");
   if(nonlinearity_integer==0)    {
@@ -471,7 +481,7 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
     is_noisy = true;
   csae = new(allocator) CommunicatingStackedAutoencoder("csae", nonlinearity, tied_weights, n_inputs,
               n_layers, units_per_hidden_layer, n_classes,
-              is_noisy, units_per_speech_layer);
+              is_noisy, units_per_speech_layer,  communication_type, n_communication_layers);
 
   csae->loadXFile(m);
 
