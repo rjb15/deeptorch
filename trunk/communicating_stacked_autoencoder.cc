@@ -345,12 +345,27 @@ void CommunicatingStackedAutoencoder::setDestructionOptions(real destruct_prob, 
 
 void CommunicatingStackedAutoencoder::loadXFile(XFile *file)
 {
-  sup_unsup_comC_machine->loadXFile(file);
+  if (communication_type==0)
+    sup_unsup_comA_machine->loadXFile(file);
+  else if (communication_type==1)
+    sup_unsup_comB_machine->loadXFile(file);
+  else if (communication_type==2)
+    sup_unsup_comC_machine->loadXFile(file);
+  else
+    error("CommunicatingStackedAutoencoder::loadXFile : invalid communication_type");
+
 }
 
 void CommunicatingStackedAutoencoder::saveXFile(XFile *file)
 {
-  sup_unsup_comC_machine->saveXFile(file);
+  if (communication_type==0)
+    sup_unsup_comA_machine->saveXFile(file);
+  else if (communication_type==1)
+    sup_unsup_comB_machine->saveXFile(file);
+  else if (communication_type==2)
+    sup_unsup_comC_machine->saveXFile(file);
+  else
+    error("CommunicatingStackedAutoencoder::saveXFile : invalid communication_type");
 }
 
 CommunicatingStackedAutoencoder::~CommunicatingStackedAutoencoder()
