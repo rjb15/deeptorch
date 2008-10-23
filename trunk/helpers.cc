@@ -552,16 +552,20 @@ void saveWeightMatrices(CommunicatingStackedAutoencoder* csae, std::string dir, 
     saveWeightMatrix(ss.str(), csae->decoders[i], is_transposed);
 
     // F
-    ss.str("");
-    ss.clear();
-    ss << dir << "F" << i << ".txt";
-    saveWeightMatrix(ss.str(), csae->speakers[i], false);
+    if (csae->communication_type > 0)  {
+      ss.str("");
+      ss.clear();
+      ss << dir << "F" << i << ".txt";
+      saveWeightMatrix(ss.str(), csae->speakers[i], false);
+    }
 
     // G
-    ss.str("");
-    ss.clear();
-    ss << dir << "G" << i << ".txt";
-    saveWeightMatrix(ss.str(), csae->listeners[i], is_transposed);
+    if (csae->communication_type > 1)  {
+      ss.str("");
+      ss.clear();
+      ss << dir << "G" << i << ".txt";
+      saveWeightMatrix(ss.str(), csae->listeners[i], is_transposed);
+    }
   }
 
   // output the output layer
@@ -614,9 +618,11 @@ void saveRepresentations(CommunicatingStackedAutoencoder* csae, std::string dir,
   std::stringstream ss;
   for(int i=0; i<nhid; i++)  {
     openNumberedRepresentationFile(&fds_hidden[i], dir, "hidden_l", i);
-    openNumberedRepresentationFile(&fds_speech[i], dir, "speech_l", i);
     openNumberedRepresentationFile(&fds_recons_from_hidden[i], dir, "recons_from_hidden_l", i);
-    openNumberedRepresentationFile(&fds_recons_from_speech[i], dir, "recons_from_speech_l", i);
+    if (csae->communication_type > 0)
+      openNumberedRepresentationFile(&fds_speech[i], dir, "speech_l", i);
+    if (csae->communication_type > 1)
+      openNumberedRepresentationFile(&fds_recons_from_speech[i], dir, "recons_from_speech_l", i);
   }
 
   // create a place to exponentiate the outputs (logsoftmax)
@@ -625,7 +631,16 @@ void saveRepresentations(CommunicatingStackedAutoencoder* csae, std::string dir,
   // for each example fprop and then print everything
   for(int i=0; i<n_examples; i++)       {
     data->setExample(i);
-    csae->sup_unsup_comC_machine->forward(data->inputs);
+    
+    if (csae->communication_type == 0)  {
+      csae->sup_unsup_comA_machine->forward(data->inputs);
+    }  else if (csae->communication_type == 1)  {
+      csae->sup_unsup_comB_machine->forward(data->inputs);
+    }  else if (csae->communication_type == 2)  {
+      csae->sup_unsup_comC_machine->forward(data->inputs);
+    }  else  {
+      error("saveRepresentations - invalid communication_type.");
+    }
 
     saveRepresentation(&fd_input, data->inputs->frames[0], data->n_inputs);
     for(int j=0; j<csae->n_outputs; j++)        {
@@ -635,9 +650,11 @@ void saveRepresentations(CommunicatingStackedAutoencoder* csae, std::string dir,
 
     for(int l=0; l<nhid; l++)  {
       saveRepresentation(&fds_hidden[l], csae->encoders[l]->outputs->frames[0], csae->encoders[l]->n_outputs);
-      saveRepresentation(&fds_speech[l], csae->speakers[l]->outputs->frames[0], csae->speakers[l]->n_outputs);
       saveRepresentation(&fds_recons_from_hidden[l], csae->decoders[l]->outputs->frames[0], csae->decoders[l]->n_outputs);
-      saveRepresentation(&fds_recons_from_speech[l], csae->listeners[l]->outputs->frames[0], csae->listeners[l]->n_outputs);
+      if (csae->communication_type > 0)
+        saveRepresentation(&fds_speech[l], csae->speakers[l]->outputs->frames[0], csae->speakers[l]->n_outputs);
+      if (csae->communication_type > 1)
+        saveRepresentation(&fds_recons_from_speech[l], csae->listeners[l]->outputs->frames[0], csae->listeners[l]->n_outputs);
     }
   }
 
@@ -646,9 +663,11 @@ void saveRepresentations(CommunicatingStackedAutoencoder* csae, std::string dir,
   fd_output.close();
   for(int i=0; i<nhid; i++)  {
     fds_hidden[i].close();
-    fds_speech[i].close();
     fds_recons_from_hidden[i].close();
-    fds_recons_from_speech[i].close();
+    if (csae->communication_type > 0)
+      fds_speech[i].close();
+    if (csae->communication_type > 1)
+      fds_recons_from_speech[i].close();
   }
 
 }
