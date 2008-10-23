@@ -1,31 +1,37 @@
-// Copyright 2008 Google Inc. All Rights Reserved.
-// Author: manzagop@google.com (Pierre-Antoine Manzagol)
+// Copyright 2008 Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+const char *help = "\
+sae_load\n\
+\n\
+This program will load a model and test it on a dataset.\n\
+\n";
 
+#include <string>
 #include <sstream>
-#include "base/google.h"
-#include "file/base/file.h"
-#include "third_party/Torch3/Allocator.h"
-#include "third_party/Torch3/ClassFormatDataSet.h"
-#include "third_party/Torch3/OneHotClassFormat.h"
-#include "third_party/Torch3/Measurer.h"
-#include "third_party/Torch3/MSEMeasurer.h"
-#include "third_party/Torch3/ClassMeasurer.h"
-#include "third_party/Torch3/ClassNLLMeasurer.h"
-#include "experimental/torch3google/GoogleMatDataSet.h"
-#include "experimental/torch3google/GoogleDiskXFile.h"
 
-#include "experimental/popnnet/mains/helpers.h"
-
-DEFINE_string(model_filename, "", "the model filename");
-DEFINE_string(test_data_file, "/home/manzagop/data/mnist/mnist_test.txt", "name of the test file");
-DEFINE_string(expdir, "reload", "location where to write the expdir folder");
-// --- Task ---
-DEFINE_string(task, "mnist", "name of the task");
-DEFINE_int32(n_inputs, 784, "number of inputs");
-DEFINE_int32(n_classes, 10, "number of targets");
-// --- Stuff ---
-DEFINE_int32(max_load, -1, "max number of examples to load for train");
-DEFINE_bool(binary_mode, false, "binary mode for files");
+#include "CmdLine.h"
+#include "Allocator.h"
+#include "ClassFormatDataSet.h"
+#include "OneHotClassFormat.h"
+#include "Measurer.h"
+#include "MSEMeasurer.h"
+#include "ClassMeasurer.h"
+#include "ClassNLLMeasurer.h"
+#include "MatDataSet.h"
+#include "DiskXFile.h"
+#include "helpers.h"
 
 
 using namespace Torch;
@@ -35,33 +41,75 @@ using namespace Torch;
 // ************
 int main(int argc, char **argv)
 {
-  InitGoogle(argv[0], &argc, &argv, true);
-  File::Init();
+
+  // === The command-line ===
+
+  int flag_n_inputs;
+  int flag_n_classes;
+  char *flag_model_filename;
+  char *flag_testdata_filename;
+
+  char *flag_expdir;
+  char *flag_task;
+  int flag_max_load;
+  bool flag_binary_mode;
+
+  // Construct the command line
+  CmdLine cmd;
+
+  // Put the help line at the beginning
+  cmd.info(help);
+
+  cmd.addText("\nArguments:");
+
+  cmd.addICmdArg("-n_inputs", &flag_n_inputs, "number of inputs");
+  cmd.addICmdArg("-n_classes", &flag_n_classes, "number of targets");
+  cmd.addSCmdArg("-model_filename", &flag_model_filename, "the model filename");
+  cmd.addSCmdArg("-testdata_filename", &flag_testdata_filename, "name of the test file");
+
+  cmd.addText("\nOptions:");
+  cmd.addSCmdOption("-expdir", &flag_expdir, "./", "Location where to write the expdir folder.", true);
+  cmd.addSCmdOption("-task", &flag_task, "", "name of the task", true);
+  cmd.addICmdOption("max_load", &flag_max_load, -1, "max number of examples to load for train", true);
+  cmd.addBCmdOption("binary_mode", &flag_binary_mode, false, "binary mode for files", true);
+
+  // Read the command line
+  cmd.read(argc, argv);
+
   Allocator *allocator = new Allocator;
 
-  CHECK(File::RecursivelyCreateDir(FLAGS_expdir.c_str(), mode_t(0755)));
+  std::string str_expdir = flag_expdir;
+  if(str_expdir != "./")   {
+    warning("Calling non portable mkdir!");
+    std::stringstream command;
+    command << "mkdir " << flag_expdir;
+    system(command.str().c_str());
+  }
 
   // data
-  GoogleMatDataSet test_matdata(FLAGS_test_data_file.c_str(), FLAGS_n_inputs,1,false,
-                                FLAGS_max_load, FLAGS_binary_mode);
-  ClassFormatDataSet test_data(&test_matdata,FLAGS_n_classes);
+  MatDataSet test_matdata(flag_testdata_filename, flag_n_inputs,1,false,
+                                flag_max_load, flag_binary_mode);
+  ClassFormatDataSet test_data(&test_matdata,flag_n_classes);
   OneHotClassFormat class_format(&test_data);   // Not sure about this... what if not all classes were in the test set?
 
   // model
-  CommunicatingStackedAutoencoder *csae = LoadCSAE(allocator, FLAGS_model_filename);
+  CommunicatingStackedAutoencoder *csae = LoadCSAE(allocator, flag_model_filename);
 
   // measurers
   MeasurerList measurers;
 
-  string measurer_filename;
-  measurer_filename = FLAGS_expdir + "/nll.txt";
-  GoogleDiskXFile *file_nll = new(allocator) GoogleDiskXFile(measurer_filename.c_str(),"w");
+  std::stringstream measurer_filename;
+  measurer_filename << flag_expdir << "/nll.txt";
+  DiskXFile *file_nll = new(allocator) DiskXFile(measurer_filename.str().c_str(),"w");
   ClassNLLMeasurer *measurer_nll = new(allocator) ClassNLLMeasurer(csae->outputs, &test_data,
                                                                              &class_format, file_nll);
   measurers.addNode(measurer_nll);
 
-  measurer_filename = FLAGS_expdir + "/class.txt";
-  GoogleDiskXFile *file_class = new(allocator) GoogleDiskXFile(measurer_filename.c_str(),"w");
+  measurer_filename.str("");
+  measurer_filename.clear();
+
+  measurer_filename << flag_expdir << "/class.txt";
+  DiskXFile *file_class = new(allocator) DiskXFile(measurer_filename.str().c_str(),"w");
   ClassMeasurer *measurer_class = new(allocator) ClassMeasurer(csae->outputs, &test_data,
                                                                          &class_format, file_class);
   measurers.addNode(measurer_class);
