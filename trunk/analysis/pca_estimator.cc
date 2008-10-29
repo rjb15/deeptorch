@@ -200,7 +200,15 @@ void PcaEstimator::GetLeadingEigen(Vec *the_d, Mat *the_Vt)
   // Copy the unnormalized eigen vectors and normalize them
   the_Vt->copy(Ut);
 
-  warning("I haven't normalized the eigen vectors");
+  // Normalize
+  Vec a_eigenvec(NULL, n_dim);
+  for (int i=0; i<the_Vt->m; i++) {
+    a_eigenvec.ptr = the_Vt->ptr[i];
+    real inv_norm2 = 1.0 / a_eigenvec.norm2();
+    for (int j=0; j<the_Vt->n; j++)
+      the_Vt->ptr[i][j] *= inv_norm2;
+    assert( fabs(a_eigenvec.norm2() - 1.0) < 1e-6 ); 
+  }
 
 }
 
