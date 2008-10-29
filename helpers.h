@@ -101,6 +101,8 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
 void saveWeightMatrices(CommunicatingStackedAutoencoder* csae, std::string dir, bool is_transposed);
 void saveRepresentations(CommunicatingStackedAutoencoder* csae, std::string dir,
                          DataSet *data, int n_examples);
+void saveOutputs(CommunicatingStackedAutoencoder* csae, DataSet *data, int n_outputs,
+                std::string dir, std::string data_label);
 
 }
 
