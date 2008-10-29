@@ -111,6 +111,7 @@ int main(int argc, char **argv)
   bool flag_save_model;
   bool flag_save_model_afterinit;
   bool flag_save_model_afterpretraining;
+  bool flag_save_outputs;
   bool flag_single_results_file;
   bool flag_multiple_results_files;
 
@@ -170,6 +171,7 @@ int main(int argc, char **argv)
   cmd.addBCmdOption("save_model", &flag_save_model, true, "if true, save the model", true);
   cmd.addBCmdOption("save_model_afterinit", &flag_save_model_afterinit, true, "if true, save the model after initialization", true);
   cmd.addBCmdOption("save_model_afterpretraining", &flag_save_model_afterpretraining, true, "if true, save the model after pretraining", true);
+  cmd.addBCmdOption("save_outputs", &flag_save_outputs, true, "if true, save the model's outputs on the datasets.", true);
   cmd.addBCmdOption("single_results_file", &flag_single_results_file, false, "if true, saves the results into a single file (1 for sup, 1 for unsup, 1 for supunsup)", true);
   cmd.addBCmdOption("multiple_results_files", &flag_multiple_results_files, true, "if true, save results into different files, depending on the cost", true);
 
@@ -418,6 +420,13 @@ int main(int argc, char **argv)
               flag_tied_weights, flag_nonlinearity, flag_recons_cost,
               flag_corrupt_prob, flag_corrupt_value,
               &csae);
+  }
+
+  // === Save outputs ===
+  if (flag_save_outputs)  {
+    saveOutputs(&csae, &train_data, 1, expdir, "train");
+    saveOutputs(&csae, &valid_data, 1, expdir, "valid");
+    saveOutputs(&csae, &test_data, 1, expdir, "test");
   }
 
   free(units_per_hidden_layer);
