@@ -106,8 +106,11 @@ int main(int argc, char **argv)
   int flag_start_seed;
   int flag_model_seed;
   int flag_max_load;
+  int flag_max_train_load;
   bool flag_binary_mode;
   bool flag_save_model;
+  bool flag_save_model_afterinit;
+  bool flag_save_model_afterpretraining;
   bool flag_single_results_file;
   bool flag_multiple_results_files;
 
@@ -161,9 +164,12 @@ int main(int argc, char **argv)
   // Stuff
   cmd.addICmdOption("start_seed", &flag_start_seed, 1, "the random seed used in the beginning (-1 to for random seed)", true);
   cmd.addICmdOption("model_seed", &flag_model_seed, 2, "the random seed used just before model initialization (-1 to for random seed)", true);
-  cmd.addICmdOption("max_load", &flag_max_load, -1, "max number of examples to load for train", true);
+  cmd.addICmdOption("max_load", &flag_max_load, -1, "max number of examples to load for valid and test", true);
+  cmd.addICmdOption("max_train_load", &flag_max_train_load, -1, "max number of examples to load for train", true);
   cmd.addBCmdOption("binary_mode", &flag_binary_mode, false, "binary mode for files", true);
   cmd.addBCmdOption("save_model", &flag_save_model, true, "if true, save the model", true);
+  cmd.addBCmdOption("save_model_afterinit", &flag_save_model_afterinit, true, "if true, save the model after initialization", true);
+  cmd.addBCmdOption("save_model_afterpretraining", &flag_save_model_afterpretraining, true, "if true, save the model after pretraining", true);
   cmd.addBCmdOption("single_results_file", &flag_single_results_file, false, "if true, saves the results into a single file (1 for sup, 1 for unsup, 1 for supunsup)", true);
   cmd.addBCmdOption("multiple_results_files", &flag_multiple_results_files, true, "if true, save results into different files, depending on the cost", true);
 
@@ -204,7 +210,13 @@ int main(int argc, char **argv)
      << "-l2=" << flag_l2_decay << "-bdk=" << flag_bias_decay
      << "-uw=" << flag_unsup_weight
      << "-ecw=" << flag_eval_criter_weights << "-cFs=" << flag_criter_avg_framesize
-     << "-ss=" << flag_start_seed << "-ms=" << flag_model_seed << "/";
+     << "-ss=" << flag_start_seed << "-ms=" << flag_model_seed;
+
+  if (flag_multiple_results_files)
+     ss << "/";
+  else
+     ss << "_";
+
   std::string expdir = ss.str();
 
   if (!flag_single_results_file)        {
@@ -222,7 +234,7 @@ int main(int argc, char **argv)
 
   // === Create the DataSets ===
   MatDataSet train_matdata(flag_train_data_file, flag_n_inputs,1,false,
-                                 flag_max_load, flag_binary_mode);
+                                 flag_max_train_load, flag_binary_mode);
   MatDataSet valid_matdata(flag_valid_data_file, flag_n_inputs,1,false,
                                  flag_max_load, flag_binary_mode);
   MatDataSet test_matdata(flag_test_data_file, flag_n_inputs,1,false,
@@ -323,7 +335,15 @@ int main(int argc, char **argv)
 
     csae_trainer.ProfileGradientsInitialize();
   }
-
+  
+  if(flag_save_model_afterinit) {
+    SaveCSAE(expdir,"afterinit",
+              flag_n_layers, flag_n_inputs, units_per_hidden_layer, units_per_speech_layer,
+              flag_n_classes,
+              flag_tied_weights, flag_nonlinearity, flag_recons_cost,
+              flag_corrupt_prob, flag_corrupt_value,
+              &csae);
+  }
   // --- train using the layerwise unsupervised criterions ---
   if(flag_max_iter_lwu) {
     csae_trainer.setROption("learning rate", flag_lr_lwu);
@@ -350,6 +370,15 @@ int main(int argc, char **argv)
     }
 
     csae_trainer.TrainUnsup(&train_data, &csae_measurers);
+  }
+
+  if(flag_save_model_afterpretraining) {
+    SaveCSAE(expdir,"afterpretraining",
+              flag_n_layers, flag_n_inputs, units_per_hidden_layer, units_per_speech_layer,
+              flag_n_classes,
+              flag_tied_weights, flag_nonlinearity, flag_recons_cost,
+              flag_corrupt_prob, flag_corrupt_value,
+              &csae);
   }
 
   // --- train using all individual criterions at once ---
@@ -383,7 +412,7 @@ int main(int argc, char **argv)
 
   // === Save model ===
   if(flag_save_model) {
-    SaveCSAE(expdir,
+    SaveCSAE(expdir,"final",
               flag_n_layers, flag_n_inputs, units_per_hidden_layer, units_per_speech_layer,
               flag_n_classes,
               flag_tied_weights, flag_nonlinearity, flag_recons_cost,
