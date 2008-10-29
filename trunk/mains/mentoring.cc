@@ -513,7 +513,7 @@ int main(int argc, char **argv)
 
   // === Save model ===
   if(flag_save_model) {
-    SaveCSAE(expdir,
+    SaveCSAE(expdir,"final",
               flag_n_layers, flag_n_inputs, units_per_hidden_layer, units_per_speech_layer,
               flag_n_classes,
               flag_tied_weights, flag_nonlinearity, flag_recons_cost,

@@ -57,6 +57,53 @@ void StochasticGradientPlus::train(DataSet *data, MeasurerList *measurers)
 
   TrainInitialize();
 
+  // ---------- Ugly hack in order to get the measures BEFORE training
+   IterInitialize();
+  ((GradientMachine *)machine)->iterInitialize();
+  for(int i = 0; i < n_meas[0]; i++)
+    meas[0][i]->measureIteration();
+
+  // Measure on datasets other than the train dataset
+  // le data 0 est le train dans tous les cas...
+  for(int julie = 0; julie < n_datas; julie++)        {
+    DataSet *dataset = datas[julie];
+
+    for(int t = 0; t < dataset->n_examples; t++)
+    {
+      dataset->setExample(t);
+      machine->forward(dataset->inputs);
+
+      for(int i = 0; i < n_meas[julie]; i++)
+        meas[julie][i]->measureExample();
+    }
+
+    for(int i = 0; i < n_meas[julie]; i++)
+      meas[julie][i]->measureIteration();
+  }
+
+  IterFinalize();
+  if (resultsfile) {
+    // Writing all the errors to a results files. Assumes 
+    // - that each used measurer has a filed called "internal_error" 
+    // (which is the case for most standard measurers which return
+    // a single real as a result
+    // - that internal_error is a real
+    real current_meas_err = 0.;
+    for(int julie = 0; julie < n_datas; julie++)  {
+      for(int i = 0; i < n_meas[julie]; i++) {
+        current_meas_err = meas[julie][i]->current_error;
+        //if (binary_mode)
+        //  resultsfile->write(current_meas_err,sizeof(real),1);
+        //else
+        resultsfile->printf("%g ",current_meas_err);
+      }
+    }
+    resultsfile->printf("\n");
+    resultsfile->flush();
+  }
+  //---------- End of ugly hack
+
+
   while(1)
   {
     IterInitialize();

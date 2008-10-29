@@ -346,13 +346,13 @@ void CommunicatingSaePairTrainer::FreeComDataSetsCriteriaMeasurers()
 */
 
 
-void SaveCSAE(std::string expdir, int n_layers, int n_inputs, int *units_per_hidden_layer, int *units_per_speech_layer,
+void SaveCSAE(std::string expdir, std::string type, int n_layers, int n_inputs, int *units_per_hidden_layer, int *units_per_speech_layer,
               int n_classes,
               bool tied_weights, std::string nonlinearity, std::string recons_cost,
               real corrupt_prob, real corrupt_value,
               CommunicatingStackedAutoencoder *csae)
 {
-  std::string model_filename = expdir + "model.save";
+  std::string model_filename = expdir + type + "model.save";
   DiskXFile model_(model_filename.c_str(), "w");
 
   // save whar's necessary to rebuilding the architecture
