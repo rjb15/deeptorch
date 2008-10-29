@@ -686,7 +686,7 @@ void saveOutputs(CommunicatingStackedAutoencoder* csae, DataSet *data, int n_out
     csae->forward(data->inputs);
 
     for (int j=0; j<n_outputs; j++)
-      ss_outputs << csae->outputs->frames[0][i] << " ";
+      ss_outputs << csae->outputs->frames[0][j] << " ";
 
   }
 
