@@ -672,4 +672,34 @@ void saveRepresentations(CommunicatingStackedAutoencoder* csae, std::string dir,
 
 }
 
+void saveOutputs(CommunicatingStackedAutoencoder* csae, DataSet *data, int n_outputs,
+                std::string dir, std::string data_label)
+{
+
+  csae->setDataSet(data);
+  std::stringstream ss_outputs;
+
+  // Iterate over the data, putting the outputs in a stringstream
+  for (int i=0; i<data->n_examples; i++)  {
+
+    data->setExample(i);
+    csae->forward(data->inputs);
+
+    for (int j=0; j<n_outputs; j++)
+      ss_outputs << csae->outputs->frames[0][i] << " ";
+
+  }
+
+  // Save the outputs to a file
+  std::ofstream fd_outputs;
+  std::stringstream ss_filename;
+  ss_filename << dir << data_label << n_outputs << "outputs.txt";
+  fd_outputs.open(ss_filename.str().c_str());
+  if (!fd_outputs.is_open())
+    error("saveOutputs(...) - cannot open the file.");
+
+  fd_outputs << ss_outputs.str() << std::endl;
+  fd_outputs.close();
+}
+
 }
