@@ -22,6 +22,7 @@ gradients.\n";
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <fstream>
 #include <cassert>
 
 #include "Allocator.h"
@@ -141,24 +142,76 @@ int main(int argc, char **argv)
     }
   }
 
+  Vec **eigenvals = (Vec**) allocator->alloc(sizeof(Vec*)*n_param_groups);
+  Mat **eigenvecs = (Mat**) allocator->alloc(sizeof(Mat*)*n_param_groups);
+
+
+  // Save the results in the 'hessian' folder
+
+  // - create the folder
+  warning("Calling non portable mkdir!");
+  std::string command = "mkdir hessian";
+  system(command.c_str());
+
+  // - file for the number of parameter groups
+  std::ofstream fd_n_param_groups;
+  fd_n_param_groups.open("hessian/n_param_groups.txt");
+  if (!fd_n_param_groups.is_open())
+    error("Can't open 'hessian/n_param_groups.txt'");
+  fd_n_param_groups << n_param_groups << std::endl;
+  fd_n_param_groups.close();
+
+  // - Grab and save the eigen values-vectors
   for (int i=0; i<der_params->n_data; i++)  {
     // Grab and print the eigen values vectors
-    Vec eigenvals(flag_n_eigen);
-    Mat eigenvecs(flag_n_eigen, der_params->size[i]);
+    eigenvals[i] = new(allocator) Vec(flag_n_eigen);
+    eigenvecs[i] = new(allocator) Mat(flag_n_eigen, der_params->size[i]);
 
-    estimators[i]->GetLeadingEigen(&eigenvals, &eigenvecs);
+    estimators[i]->GetLeadingEigen(eigenvals[i], eigenvecs[i]);
 
     std::cout << der_params->size[i] << " parameters." << std::endl;
-    for (int j=0; j<eigenvals.n; j++)
-      std::cout << eigenvals.ptr[j] << std::endl;
+    for (int j=0; j<eigenvals[i]->n; j++)
+      std::cout << eigenvals[i]->ptr[j] << std::endl;
 
     // Print first eigen vector
     /*for (int j=0; j<der_params->size[i]; j++)
-      std::cout << eigenvecs.ptr[0][j] << " ";
+      std::cout << eigenvecs[i]->ptr[0][j] << " ";
     std::cout << std::endl;*/
+
+    // save eigenvals to a file
+    std::ofstream fd_eigenval;
+    std::stringstream ss_filename;
+    ss_filename << "hessian/eigenval" << i << ".txt";
+    fd_eigenval.open(ss_filename.str().c_str());
+    if (!fd_eigenval.is_open())
+      error("Can't open hessian/eigenval#?#.txt");
+
+    for (int j=0; j<eigenvals[i]->n; j++)
+      fd_eigenval << eigenvals[i]->ptr[j] << std::endl;
+
+    fd_eigenval.close();
+
+    // save eigenvecs to a file
+    std::ofstream fd_eigenvec;
+    ss_filename.str("");
+    ss_filename.clear();
+    ss_filename << "hessian/eigenvec" << i << ".txt";
+    fd_eigenvec.open(ss_filename.str().c_str());
+    if (!fd_eigenvec.is_open())
+      error("Can't open hessian/eigenval#?#.txt");
+
+    for (int j=0; j<eigenvecs[i]->m; j++)  {
+      for (int k=0; k<eigenvecs[i]->n; k++)
+        fd_eigenvec << eigenvecs[i]->ptr[j][k] << " ";
+      fd_eigenvec << std::endl;
+    }
+
+    fd_eigenvec.close();
   }
+
 
   delete allocator;
   return(0);
 }
+
 
