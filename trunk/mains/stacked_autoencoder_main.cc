@@ -424,9 +424,9 @@ int main(int argc, char **argv)
 
   // === Save outputs ===
   if (flag_save_outputs)  {
-    saveOutputs(&csae, &train_data, 1, expdir, "train");
-    saveOutputs(&csae, &valid_data, 1, expdir, "valid");
-    saveOutputs(&csae, &test_data, 1, expdir, "test");
+    saveOutputs(&csae, &train_data, flag_n_classes, expdir, "train");
+    saveOutputs(&csae, &valid_data, flag_n_classes, expdir, "valid");
+    saveOutputs(&csae, &test_data, flag_n_classes, expdir, "test");
   }
 
   free(units_per_hidden_layer);
