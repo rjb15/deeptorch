@@ -38,7 +38,7 @@ class Binner : public Object
    Binner(int n_bins_);
 
    virtual void init(int n_samples, real *samples);
-   virtual void draw();
+   virtual real draw();
 
    virtual void loadXFile(XFile *file);
    virtual void saveXFile(XFile *file);
