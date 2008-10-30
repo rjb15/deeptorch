@@ -60,8 +60,6 @@ void StochasticGradientPlus::train(DataSet *data, MeasurerList *measurers)
   // ---------- Ugly hack in order to get the measures BEFORE training
    IterInitialize();
   ((GradientMachine *)machine)->iterInitialize();
-  for(int i = 0; i < n_meas[0]; i++)
-    meas[0][i]->measureIteration();
 
   // Measure on datasets other than the train dataset
   // le data 0 est le train dans tous les cas...
