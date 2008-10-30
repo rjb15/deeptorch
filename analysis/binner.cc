@@ -89,10 +89,21 @@ real Binner::draw()
 
 void Binner::loadXFile(XFile *file)
 {
+  file->taggedRead(&n_bins, sizeof(int), 1, "n_bins");
+  file->taggedRead(bin_n_samples, sizeof(int), n_bins, "bin_n_samples");
+  file->taggedRead(bin_cumulative_n_samples, sizeof(int), n_bins, "bin_cumulative_n_samples");
+  file->taggedRead(bin_lowers, sizeof(real), n_bins, "bin_lowers");
+  file->taggedRead(bin_uppers, sizeof(real), n_bins, "bin_uppers");
+
 }
 
 void Binner::saveXFile(XFile *file)
 {
+  file->taggedWrite(&n_bins, sizeof(int), 1, "n_bins");
+  file->taggedWrite(bin_n_samples, sizeof(int), n_bins, "bin_n_samples");
+  file->taggedWrite(bin_cumulative_n_samples, sizeof(int), n_bins, "bin_cumulative_n_samples");
+  file->taggedWrite(bin_lowers, sizeof(real), n_bins, "bin_lowers");
+  file->taggedWrite(bin_uppers, sizeof(real), n_bins, "bin_uppers");
 }
 
 Binner::~Binner()
