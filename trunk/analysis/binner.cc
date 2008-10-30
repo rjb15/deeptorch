@@ -21,13 +21,14 @@
 
 namespace Torch {
 
-Binner::Binner(int n_bins_)
+Binner::Binner()
 {
-  n_bins = n_bins_;
 }
 
-void Binner::init(int n_samples, real *samples)
+void Binner::init(int the_n_bins, int n_samples, real *samples)
 {
+  n_bins = the_n_bins;
+
   // Start by sorting the numbers. This alters samples!
   std::sort(samples, samples+n_samples);
 

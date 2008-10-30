@@ -51,6 +51,7 @@ the supervised cost.\n";
 #include "communicating_stacked_autoencoder.h"
 #include "stacked_autoencoder_trainer.h"
 #include "helpers.h"
+#include "binner.h"
 
 
 using namespace Torch;
@@ -82,6 +83,8 @@ int main(int argc, char **argv)
   char *flag_recons_cost;
   real flag_corrupt_prob;
   real flag_corrupt_value;
+  bool flag_init_from_binners;
+  char *flag_binners_location;
 
   // --- Training ---
   int flag_max_iter_lwu;
@@ -142,6 +145,8 @@ int main(int argc, char **argv)
   cmd.addSCmdOption("-recons_cost", &flag_recons_cost, "xentropy", "which cost to use for reconstruction", true);
   cmd.addRCmdOption("-corrupt_prob", &flag_corrupt_prob, 0.0, "probability of corrupting autoencoder inputs", true);
   cmd.addRCmdOption("-corrupt_value", &flag_corrupt_value, 0.0, "value to corrupt autoencoder inputs to", true);
+  cmd.addBCmdOption("-init_from_binners", &flag_init_from_binners, false, "if you want to init the model from binners");
+  cmd.addSCmdOption("-binners_location", &flag_binners_location, "", "directory where to find the binners");
 
   // Training
   cmd.addText("\nTraining options:");
@@ -191,6 +196,9 @@ int main(int argc, char **argv)
     error("With xentropy reconstruction, must use a transfer function with output in [0,1].");
   }
 
+  if (flag_init_from_binners && (flag_max_iter_lwu || flag_max_iter_uc || flag_max_iter_ac))
+    error("flag_init_from_binners=true initializes weights before supervised training. There should be no prior phase!");
+
   std::string str_train_data_file = flag_train_data_file;
   std::string str_valid_data_file = flag_valid_data_file;
   std::string str_test_data_file = flag_test_data_file;
@@ -206,7 +214,9 @@ int main(int argc, char **argv)
      << "-nhu=" << flag_n_hidden_units
      << "-tied=" << flag_tied_weights << "-nlin=" << flag_nonlinearity << "-recost=" << flag_recons_cost
      << "-ns=" << flag_n_speech << "-cprob=" << flag_corrupt_prob
-     << "-cval=" << flag_corrupt_value  << "-lwe=" << flag_max_iter_lwu << "-ue=" << flag_max_iter_uc
+     << "-cval=" << flag_corrupt_value 
+     << "-ifb=" << flag_init_from_binners
+     << "-lwe=" << flag_max_iter_lwu << "-ue=" << flag_max_iter_uc
      << "-ace=" << flag_max_iter_ac << "-sce=" << flag_max_iter_sc
      << "-lwu=" << flag_lr_lwu 
      << "-lru=" << flag_lr_unsup << "-lrsu=" << flag_lr_supunsup << "-lrs=" << flag_lr_sup
@@ -406,6 +416,16 @@ int main(int argc, char **argv)
     csae_trainer.profile_gradients = false;
 
   // --- train with only supervised cost ---
+  
+  // Re-initialize the *MLP* using weight and bias distributions from a binner
+  // Does not apply to the output weights!
+  if (flag_init_from_binners) {
+    Binner **w_binners = (Binner**) allocator->alloc(sizeof(Binner*)*csae.n_hidden_layers);
+    Binner **b_binners = (Binner**) allocator->alloc(sizeof(Binner*)*csae.n_hidden_layers);
+    LoadBinners(allocator, flag_binners_location, &csae, w_binners, b_binners);
+    ReInitCsaeFromBinners(&csae, w_binners, b_binners);
+  }
+
   warning("Make sure the supervised training does what you think it does. For example, the lr is reset undecayed!");
   if (flag_max_iter_sc) {
     csae_trainer.setROption("learning rate", flag_lr_sup);

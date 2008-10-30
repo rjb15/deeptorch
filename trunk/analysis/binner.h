@@ -36,10 +36,10 @@ class Binner : public Object
    real *bin_uppers;
 
 
-   Binner(int n_bins_);
+   Binner();
 
    // Does the binning. Watch out, samples will get ordered!
-   virtual void init(int n_samples, real *samples);
+   virtual void init(int the_n_bins, int n_samples, real *samples);
    virtual real draw();
 
    virtual void loadXFile(XFile *file);
