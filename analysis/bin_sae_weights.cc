@@ -25,6 +25,7 @@ This program will use binners to represent a sae's weights and bias\n\
 #include "Allocator.h"
 #include "ClassFormatDataSet.h"
 #include "OneHotClassFormat.h"
+#include "Linear.h"
 #include "Measurer.h"
 #include "MSEMeasurer.h"
 #include "ClassMeasurer.h"
