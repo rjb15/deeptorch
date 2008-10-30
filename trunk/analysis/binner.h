@@ -17,6 +17,7 @@
 
 #include <string>
 #include "Object.h"
+#include "XFile.h"
 
 namespace Torch {
 
@@ -37,6 +38,7 @@ class Binner : public Object
 
    Binner(int n_bins_);
 
+   // Does the binning. Watch out, samples will get ordered!
    virtual void init(int n_samples, real *samples);
    virtual real draw();
 
