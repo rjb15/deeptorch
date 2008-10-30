@@ -315,6 +315,59 @@ void StackedAutoencoderTrainer::TrainOutputLayer(DataSet *supervised_train_data,
 
 //--------------
 
+void StackedAutoencoderTrainer::TrainUnsupNotOutput()
+{
+  std::stringstream ss;
+  ss << sae->name << " : training with unsupervised costs - not training the outputer.";
+  message(ss.str().c_str());
+
+  // *** Set up a ConcatCriterion
+  Criterion **the_criterions = (Criterion **) allocator->alloc(sizeof(Criterion *)*(sae->n_hidden_layers));
+
+  // The unsup criterions already have their dataset set
+  for(int i=0; i<sae->n_hidden_layers; i++)     {
+    the_criterions[i] = unsup_criterions[i];
+  }
+
+  // Weights for the unsupervised criteria
+  // TODO Resolve what to do about the weighting in this situation
+  for(int i=0; i<sae->n_hidden_layers; i++)     {
+    // The +1 is to skip the supervised criterion weight.
+    criterions_weights[1+i] = 1.0; //the_unsup_criterions_weight;
+  }
+
+  //
+  Criterion *concat_criterion;
+  concat_criterion = new(allocator) ConcatCriterion(sae->unsup_machine->n_outputs,
+                                                 sae->n_hidden_layers,
+                                                 the_criterions,
+                                                 // Skip the sup. crit. weight
+                                                 &criterions_weights[1]);
+  // *** Measurers
+  // See the header for the explanation of this.
+
+  MeasurerList the_measurers;
+
+  // The unsupervised Measurers all have "train DataSets".
+  for(int i=0; i<sae->n_hidden_layers; i++)   {
+    // use of unsup_datasets[0] is HACK RELATED - see below
+    FakeDataMeasurer *faker_measurer = new(allocator) FakeDataMeasurer(unsup_datasets[0], unsup_measurers[i]);
+    the_measurers.addNode(faker_measurer);
+  }
+
+  // --- Set up a trainer and train ---
+  machine = sae->unsup_machine;
+  criterion = concat_criterion;
+
+  // Calling setExample on unsup_datasets[0] will call it for supervised_train_data also.
+  train(unsup_datasets[0], &the_measurers);
+
+  machine = sae;
+  criterion = sup_criterion;
+
+}
+
+
 void StackedAutoencoderTrainer::TrainUnsup(DataSet *supervised_train_data,
                                               MeasurerList *measurers)
 {

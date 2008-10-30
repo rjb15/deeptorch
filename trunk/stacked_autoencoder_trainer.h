@@ -112,6 +112,7 @@ class StackedAutoencoderTrainer : public StochasticGradientPlus
     virtual void TrainOutputLayer(DataSet *supervised_train_data,
                                   MeasurerList *measurers);
 
+    virtual void TrainUnsupNotOutput();
     virtual void TrainUnsup(DataSet *data, MeasurerList *measurers);
     virtual void TrainSupUnsup(DataSet *data, MeasurerList *measurers,
                                real the_unsup_criterions_weight);

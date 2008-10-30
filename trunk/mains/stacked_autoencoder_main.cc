@@ -98,6 +98,7 @@ int main(int argc, char **argv)
   real flag_l2_decay;
   real flag_bias_decay;
   real flag_unsup_weight;
+  bool flag_unsup_trains_outputer;
   bool flag_eval_criter_weights;
   bool flag_criter_avg_framesize;
   bool flag_profile_gradients;
@@ -158,6 +159,7 @@ int main(int argc, char **argv)
   cmd.addRCmdOption("-l2_decay", &flag_l2_decay, 0.0, "l2 weight decay", true);
   cmd.addRCmdOption("-bias_decay", &flag_bias_decay, 0.0, "bias decay", true);
   cmd.addRCmdOption("-unsup_weight", &flag_unsup_weight, 1.0, "multiplicative weight to give to the unsupervised costs.", true);
+  cmd.addBCmdOption("-unsup_trains_outputer", &flag_unsup_trains_outputer, false, "if true, train the outputer during the unsup phase.", true);
   cmd.addBCmdOption("-eval_criter_weights", &flag_eval_criter_weights, false, "if true, weigh the criterions based on hessian-based magic.", true);
   cmd.addBCmdOption("-criter_avg_framesize", &flag_criter_avg_framesize, false, "if true, costs of unsup criterions are divided by number of inputs", true);
   cmd.addBCmdOption("-profile_gradients", &flag_profile_gradients, false, "if true, profile the gradients", true);
@@ -211,6 +213,7 @@ int main(int argc, char **argv)
      << "-dc=" << flag_lrate_decay << "-l1=" << flag_l1_decay
      << "-l2=" << flag_l2_decay << "-bdk=" << flag_bias_decay
      << "-uw=" << flag_unsup_weight
+     << "-uto=" << flag_unsup_trains_outputer
      << "-ecw=" << flag_eval_criter_weights << "-cFs=" << flag_criter_avg_framesize
      << "-ss=" << flag_start_seed << "-ms=" << flag_model_seed;
 
@@ -371,7 +374,11 @@ int main(int argc, char **argv)
       csae_trainer.resultsfile = resultsfile;
     }
 
-    csae_trainer.TrainUnsup(&train_data, &csae_measurers);
+    // Train
+    if( flag_unsup_trains_outputer )
+      csae_trainer.TrainUnsup(&train_data, &csae_measurers);
+    else
+      csae_trainer.TrainUnsupNotOutput();
   }
 
   if(flag_save_model_afterpretraining) {
