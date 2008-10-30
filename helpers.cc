@@ -702,4 +702,48 @@ void saveOutputs(CommunicatingStackedAutoencoder* csae, DataSet *data, int n_out
   fd_outputs.close();
 }
 
+
+void LoadBinners(Allocator* allocator, char* flag_binners_location,
+                  CommunicatingStackedAutoencoder *csae,
+                  Binner **w_binners, Binner **b_binners)
+{
+  std::stringstream filename;
+  XFile *the_xfile;
+
+  for (int i=0; i<csae->n_hidden_layers; i++) {
+    filename.str("");
+    filename.clear();
+    filename << flag_binners_location << "binner_w" << i << ".save";
+    the_xfile = new(allocator) DiskXFile(filename.str().c_str(), "r");
+    w_binners[i] = new(allocator) Binner();
+    w_binners[i]->loadXFile(the_xfile);
+    delete the_xfile;
+
+    filename.str("");
+    filename.clear();
+    filename << flag_binners_location << "binner_b" << i << ".save";
+    the_xfile = new(allocator) DiskXFile(filename.str().c_str(), "r");
+    b_binners[i] = new(allocator) Binner();
+    b_binners[i]->loadXFile(the_xfile);
+    delete the_xfile;
+  }
+}
+
+void ReInitCsaeFromBinners(CommunicatingStackedAutoencoder *csae,
+                            Binner **w_binners, Binner **b_binners)
+{
+  for (int i=0; i<csae->n_hidden_layers; i++) {
+    Linear *linear_layer = csae->encoders[i]->linear_layer;
+    real *weights_ = linear_layer->weights;
+    real *bias_ = linear_layer->bias;
+
+    for (int j=0; j<linear_layer->n_outputs; j++) {
+      for (int k=0; k<linear_layer->n_inputs; k++)
+        weights_[k] = w_binners[i]->draw();
+      bias_[j] = b_binners[i]->draw();      
+      weights_ += linear_layer->n_inputs; 
+    }
+  }
+}
+
 }

@@ -32,6 +32,7 @@
 #include "cross_entropy_criterion.h"
 #include "cross_entropy_measurer.h"
 #include "communicating_sae_pair_trainer.h"
+#include "binner.h"
 
 namespace Torch {
 
@@ -103,6 +104,9 @@ void saveRepresentations(CommunicatingStackedAutoencoder* csae, std::string dir,
                          DataSet *data, int n_examples);
 void saveOutputs(CommunicatingStackedAutoencoder* csae, DataSet *data, int n_outputs,
                 std::string dir, std::string data_label);
+
+void LoadBinners(Allocator* allocator, char* flag_binners_location, CommunicatingStackedAutoencoder *csae, Binner **w_binners, Binner **b_binners);
+void ReInitCsaeFromBinners(CommunicatingStackedAutoencoder *csae, Binner **w_binners, Binner **b_binners);
 
 }
 
