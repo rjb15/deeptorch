@@ -420,6 +420,7 @@ int main(int argc, char **argv)
   // Re-initialize the *MLP* using weight and bias distributions from a binner
   // Does not apply to the output weights!
   if (flag_init_from_binners) {
+    message("Reinitializing the model from the binners.");
     Binner **w_binners = (Binner**) allocator->alloc(sizeof(Binner*)*csae.n_hidden_layers);
     Binner **b_binners = (Binner**) allocator->alloc(sizeof(Binner*)*csae.n_hidden_layers);
     LoadBinners(allocator, flag_binners_location, &csae, w_binners, b_binners);

@@ -717,7 +717,7 @@ void LoadBinners(Allocator* allocator, char* flag_binners_location,
     the_xfile = new(allocator) DiskXFile(filename.str().c_str(), "r");
     w_binners[i] = new(allocator) Binner();
     w_binners[i]->loadXFile(the_xfile);
-    delete the_xfile;
+    allocator->free(the_xfile);
 
     filename.str("");
     filename.clear();
@@ -725,7 +725,7 @@ void LoadBinners(Allocator* allocator, char* flag_binners_location,
     the_xfile = new(allocator) DiskXFile(filename.str().c_str(), "r");
     b_binners[i] = new(allocator) Binner();
     b_binners[i]->loadXFile(the_xfile);
-    delete the_xfile;
+    allocator->free(the_xfile);
   }
 }
 
