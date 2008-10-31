@@ -49,6 +49,7 @@ int main(int argc, char **argv)
   int flag_n_inputs;
   int flag_n_classes;
   char *flag_expdir;
+  char *flag_model_filename;
   char *flag_testdata_filename;
   int flag_is_tied;
 
@@ -67,7 +68,8 @@ int main(int argc, char **argv)
   cmd.addICmdArg("-n_inputs", &flag_n_inputs, "number of inputs");
   cmd.addICmdArg("-n_classes", &flag_n_classes, "number of targets");
   cmd.addSCmdArg("-expdir", &flag_expdir, "location where to find model.save and write out.");
-  cmd.addSCmdArg("-testdata_filename", &flag_testdata_filename, "name of the test file");
+  cmd.addSCmdArg("-model_filename", &flag_model_filename, "model filename (expected in the expdir).");
+  cmd.addSCmdArg("-testdata_filename", &flag_testdata_filename, "name of the test file (can be a path)");
   cmd.addICmdArg("-is_tied", &flag_is_tied, "Are the weights tied?");
 
   cmd.addText("\nOptions:");
@@ -109,7 +111,7 @@ int main(int argc, char **argv)
   OneHotClassFormat class_format(&test_data);   // Not sure about this... what if not all classes were in the test set?
 
   // model
-  std::string model_filename = str_expdir + "model.save";
+  std::string model_filename = str_expdir + flag_model_filename;
   CommunicatingStackedAutoencoder *csae = LoadCSAE(allocator, model_filename);
 
   // Output the weight matrices

@@ -105,15 +105,17 @@ int main(int argc, char **argv)
     // Bin
     w_binners[i] = new(allocator) Binner();
     w_binners[i]->init(flag_n_bins, n_samples, samples);
-    delete samples;    
+    //delete samples;
+    allocator->free(samples);
 
     // Save the binner
     filename.str("");
     filename.clear();
     filename << flag_outdir << "binner_w" << i << ".save";
-    the_xfile = new(allocator) DiskXFile(filename.str().c_str(), "r");
+    the_xfile = new(allocator) DiskXFile(filename.str().c_str(), "w");
     w_binners[i]->saveXFile(the_xfile);
-    delete the_xfile;
+    //delete the_xfile;
+    allocator->free(the_xfile);
     
     // *** Do the same for the biases ***
     // Copy the weights. Binner will sort them.
@@ -124,15 +126,17 @@ int main(int argc, char **argv)
     // Bin
     b_binners[i] = new(allocator) Binner();
     b_binners[i]->init(flag_n_bins, n_samples, samples);
-    delete samples;    
+    //delete samples;    
+    allocator->free(samples);
 
     // Save the binner
     filename.str("");
     filename.clear();
     filename << flag_outdir << "binner_b" << i << ".save";
-    the_xfile = new(allocator) DiskXFile(filename.str().c_str(), "r");
-    w_binners[i]->saveXFile(the_xfile);
-    delete the_xfile;
+    the_xfile = new(allocator) DiskXFile(filename.str().c_str(), "w");
+    b_binners[i]->saveXFile(the_xfile);
+    //delete the_xfile;
+    allocator->free(the_xfile);
   }
 
   delete allocator;

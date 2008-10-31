@@ -79,7 +79,7 @@ real Binner::draw()
   bin_selector = floor(bin_selector);
 
   int the_bin = 0;
-  while (bin_selector > bin_cumulative_n_samples[the_bin])
+  while (bin_selector >= bin_cumulative_n_samples[the_bin])
     the_bin++;
 
   assert(the_bin<n_bins);
@@ -91,6 +91,12 @@ real Binner::draw()
 void Binner::loadXFile(XFile *file)
 {
   file->taggedRead(&n_bins, sizeof(int), 1, "n_bins");
+
+  bin_n_samples = (int*) allocator->alloc(sizeof(int)*(n_bins));
+  bin_cumulative_n_samples = (int*) allocator->alloc(sizeof(int)*(n_bins));
+  bin_lowers = (real*) allocator->alloc(sizeof(real)*(n_bins));
+  bin_uppers = (real*) allocator->alloc(sizeof(real)*(n_bins));
+
   file->taggedRead(bin_n_samples, sizeof(int), n_bins, "bin_n_samples");
   file->taggedRead(bin_cumulative_n_samples, sizeof(int), n_bins, "bin_cumulative_n_samples");
   file->taggedRead(bin_lowers, sizeof(real), n_bins, "bin_lowers");
