@@ -424,7 +424,9 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
   units_per_speech_layer = (int*)malloc(sizeof(int)*(n_layers));
   m->taggedRead(units_per_speech_layer, sizeof(int), n_layers, "units_per_speech_layer");
   m->taggedRead(&tied_weights, sizeof(bool), 1, "tied_weights");
-  m->taggedRead(&reparametrize_tied, sizeof(bool), 1, "reparametrize_tied");
+  warning("Ignoring reparametrize_tied's value");
+  //m->taggedRead(&reparametrize_tied, sizeof(bool), 1, "reparametrize_tied");
+  reparametrize_tied = false;
 
   m->taggedRead(&communication_type, sizeof(int), 1, "communication_type");
   m->taggedRead(&n_communication_layers, sizeof(int), 1, "n_communication_layers");
