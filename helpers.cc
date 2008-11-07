@@ -362,6 +362,7 @@ void SaveCSAE(std::string expdir, std::string type, int n_layers, int n_inputs, 
   model_.taggedWrite(units_per_hidden_layer, sizeof(int), n_layers, "units_per_hidden_layer");
   model_.taggedWrite(units_per_speech_layer, sizeof(int), n_layers, "units_per_speech_layer");
   model_.taggedWrite(&tied_weights, sizeof(bool), 1, "tied_weights");
+  model_.taggedWrite(&csae->reparametrize_tied, sizeof(bool), 1, "reparametrize_tied");
   model_.taggedWrite(&csae->communication_type, sizeof(int), 1, "communication_type");
   model_.taggedWrite(&csae->n_communication_layers, sizeof(int), 1, "n_communication_layers");
 
@@ -402,6 +403,7 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
   int *units_per_speech_layer;
   int n_classes;
   bool tied_weights;
+  bool reparametrize_tied;
   int nonlinearity_integer;
   std::string nonlinearity;
   int recons_cost_integer;
@@ -422,6 +424,7 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
   units_per_speech_layer = (int*)malloc(sizeof(int)*(n_layers));
   m->taggedRead(units_per_speech_layer, sizeof(int), n_layers, "units_per_speech_layer");
   m->taggedRead(&tied_weights, sizeof(bool), 1, "tied_weights");
+  m->taggedRead(&reparametrize_tied, sizeof(bool), 1, "reparametrize_tied");
 
   m->taggedRead(&communication_type, sizeof(int), 1, "communication_type");
   m->taggedRead(&n_communication_layers, sizeof(int), 1, "n_communication_layers");
@@ -479,7 +482,7 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
   bool is_noisy = false;
   if(corrupt_prob>0.0)
     is_noisy = true;
-  csae = new(allocator) CommunicatingStackedAutoencoder("csae", nonlinearity, tied_weights, n_inputs,
+  csae = new(allocator) CommunicatingStackedAutoencoder("csae", nonlinearity, tied_weights, reparametrize_tied, n_inputs,
               n_layers, units_per_hidden_layer, n_classes,
               is_noisy, units_per_speech_layer,  communication_type, n_communication_layers);
 

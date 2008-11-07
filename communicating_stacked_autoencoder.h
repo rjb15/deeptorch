@@ -70,6 +70,7 @@ class CommunicatingStackedAutoencoder : public StackedAutoencoder
     CommunicatingStackedAutoencoder(std::string name_,
                                     std::string nonlinearity_,
                                     bool tied_weights_,
+                                    bool reparametrize_tied_,
                                     int n_inputs_,
                                     int n_hidden_layers_,
                                     int *n_hidden_units_per_layer_,

@@ -18,10 +18,14 @@
 
 namespace Torch {
 
-TransposedTiedLinear::TransposedTiedLinear(int n_inputs_, int n_outputs_, Linear* base_linear_)
+TransposedTiedLinear::TransposedTiedLinear(int n_inputs_, int n_outputs_, Linear* base_linear_,
+                                            bool reparametrize_)
     : Linear(n_inputs_, n_outputs_)
 {
   base_linear = base_linear_;
+
+  reparametrize = reparametrize_;
+  reparametrization_multiplier = sqrt((real)n_outputs / (real)n_inputs);
 
   // Get rid of the params. We use tied ones!
   allocator->free(params);
@@ -43,7 +47,8 @@ TransposedTiedLinear::TransposedTiedLinear(int n_inputs_, int n_outputs_, Linear
 void TransposedTiedLinear::frameForward(int t, real *f_inputs, real *f_outputs)
 {
   for(int i=0; i<n_outputs; i++)    {
-    f_outputs[i] = bias[i];
+    //f_outputs[i] = bias[i]; // reparametrization does not apply to bias!
+    f_outputs[i] = 0.0;
   }
 
   real *weights_ = weights;
@@ -54,6 +59,13 @@ void TransposedTiedLinear::frameForward(int t, real *f_inputs, real *f_outputs)
       f_outputs[j] += weights_[j] * input_i_;
     }
     weights_ += n_outputs;
+  }
+
+  if (reparametrize)  {
+    for(int i=0; i<n_outputs; i++)  {
+      f_outputs[i] *= reparametrization_multiplier;
+      f_outputs[i] += bias[i];
+    }
   }
 }
 
@@ -70,6 +82,11 @@ void TransposedTiedLinear::frameBackward(int t, real *f_inputs, real *beta_, rea
         beta_[i] += alpha_[j] * weights_[j];
       weights_ += n_outputs;
     }
+
+    if (reparametrize)  {
+      for(int i=0; i<n_inputs; i++)
+        beta_[i] *= reparametrization_multiplier;
+    }
   }
 
   //  --------------------
@@ -77,14 +94,24 @@ void TransposedTiedLinear::frameBackward(int t, real *f_inputs, real *beta_, rea
     der_bias[i] += alpha_[i];
   }
 
-  real *der_weights_ = der_weights;
-  for(int i=0; i<n_inputs; i++)        {
-    for(int j=0; j<n_outputs; j++)      {
-      der_weights_[j] += alpha_[j] * f_inputs[i];
+  // derive wrt weights
+  if (!reparametrize) {
+    real *der_weights_ = der_weights;
+    for(int i=0; i<n_inputs; i++)        {
+      for(int j=0; j<n_outputs; j++)      {
+        der_weights_[j] += alpha_[j] * f_inputs[i];
+      }
+      der_weights_ += n_outputs;
     }
-    der_weights_ += n_outputs;
+  } else  {
+    real *der_weights_ = der_weights;
+    for(int i=0; i<n_inputs; i++)        {
+      for(int j=0; j<n_outputs; j++)      {
+        der_weights_[j] += reparametrization_multiplier * alpha_[j] * f_inputs[i];
+      }
+      der_weights_ += n_outputs;
+    }
   }
-
 
 }
 

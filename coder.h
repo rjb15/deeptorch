@@ -36,6 +36,7 @@ class Coder : public GradientMachine
    bool is_noisy;
    Coder *tied_coder;
    bool is_transposed;
+   bool reparametrize;
    std::string nonlinearity;
 
    // The underlying machines
@@ -45,7 +46,7 @@ class Coder : public GradientMachine
 
 
    Coder(int n_inputs_, int n_outputs_, bool is_noisy_,
-         Coder *tied_coder_, bool is_transposed_, std::string nonlinearity_);
+         Coder *tied_coder_, bool is_transposed_, bool reparametrize_, std::string nonlinearity_);
 
    void BuildDestructiveLayer();
    void BuildLinearLayer();

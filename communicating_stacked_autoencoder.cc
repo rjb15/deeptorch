@@ -26,6 +26,7 @@ namespace Torch {
 CommunicatingStackedAutoencoder::CommunicatingStackedAutoencoder(std::string name_,
                                                                  std::string nonlinearity_,
                                                                  bool tied_weights_,
+                                                                 bool reparametrize_tied_,
                                                                  int n_inputs_,
                                                                  int n_hidden_layers_,
                                                                  int *n_hidden_units_per_layer_,
@@ -34,10 +35,13 @@ CommunicatingStackedAutoencoder::CommunicatingStackedAutoencoder(std::string nam
                                                                  int *n_speech_units_,
                                                                  int communication_type_,
                                                                  int n_communication_layers_)
-    : StackedAutoencoder( name_, nonlinearity_, tied_weights_, n_inputs_,
+    : StackedAutoencoder( name_, nonlinearity_, tied_weights_, reparametrize_tied_, n_inputs_,
                           n_hidden_layers_, n_hidden_units_per_layer_, n_outputs_,
                           is_noisy_)
 {
+  if (reparametrize_tied_)
+    warning("Tied weight reparametrization not handled for communicating part!");
+
   communication_type = communication_type_;
   n_communication_layers = n_communication_layers_;
 
@@ -90,11 +94,11 @@ void CommunicatingStackedAutoencoder::BuildCommunicationCoders()
   for(int i=0; i<n_communication_layers; i++)    {
     if (communication_type == 2)
       speakers[i] = new(allocator)Coder(encoders[i]->n_outputs, n_speech_units[i],
-                                        false, NULL, false, nonlinearity);
+                                        false, NULL, false, false, nonlinearity);
     else if (communication_type == 1)
       // This only works for two layers with the same number of hidden units.
       speakers[i] = new(allocator)Coder(encoders[i]->n_outputs, encoders[i]->n_outputs,
-                                        false, NULL, false, nonlinearity);
+                                        false, NULL, false, false, nonlinearity);
     else
       speakers[i] = NULL;
 
@@ -106,11 +110,11 @@ void CommunicatingStackedAutoencoder::BuildCommunicationCoders()
     for(int i=0; i<n_communication_layers; i++)    {
       if (communication_type == 2)
         noisy_speakers[i] = new(allocator)Coder(encoders[i]->n_outputs, n_speech_units[i],
-                                                true, speakers[i], false, nonlinearity);
+                                                true, speakers[i], false, false, nonlinearity);
       else if (communication_type == 1) // Using noise in this case is... weird
         // This only works for two layers with the same number of hidden units.
         noisy_speakers[i] = new(allocator)Coder(encoders[i]->n_outputs, encoders[i]->n_outputs,
-                                                true, speakers[i], false, nonlinearity);
+                                                true, speakers[i], false, false, nonlinearity);
       else
         noisy_speakers[i] = NULL;
 
@@ -125,10 +129,10 @@ void CommunicatingStackedAutoencoder::BuildCommunicationCoders()
     for(int i=0; i<n_communication_layers; i++)    {
       if(tied_weights)      {
         listeners[i] = new(allocator)Coder(n_speech_units[i], encoders[i]->n_outputs,
-                                           true, speakers[i], true, nonlinearity);
+                                           true, speakers[i], true, false, nonlinearity);
       }   else    {
         listeners[i] = new(allocator)Coder(n_speech_units[i], encoders[i]->n_outputs,
-                                           false, NULL, false, nonlinearity);
+                                           false, NULL, false, false, nonlinearity);
       }
     }
   }
