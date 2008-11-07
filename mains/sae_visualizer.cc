@@ -53,7 +53,7 @@ int main(int argc, char **argv)
   char *flag_testdata_filename;
   int flag_is_tied;
 
-  char *flag_task;
+  char *flag_model_label;
   int flag_max_load;
   bool flag_binary_mode;
 
@@ -73,7 +73,7 @@ int main(int argc, char **argv)
   cmd.addICmdArg("-is_tied", &flag_is_tied, "Are the weights tied?");
 
   cmd.addText("\nOptions:");
-  cmd.addSCmdOption("-task", &flag_task, "", "name of the task", true);
+  cmd.addSCmdOption("-model_label", &flag_model_label, "", "label of the model", true);
   cmd.addICmdOption("max_load", &flag_max_load, -1, "max number of examples to load for train", true);
   cmd.addBCmdOption("binary_mode", &flag_binary_mode, false, "binary mode for files", true);
 
@@ -89,18 +89,22 @@ int main(int argc, char **argv)
   warning("Calling non portable mkdir!");
   std::stringstream command;
 
-  command << "mkdir " << str_expdir << "visualization/";
+  command << "mkdir " << str_expdir << "visualization_" << flag_model_label << "/";
   system(command.str().c_str());
 
   command.str("");
   command.clear();
-  std::string str_weights_dir = str_expdir + "visualization/weights/"; 
+  std::string str_weights_dir = str_expdir + "visualization_";
+  str_weights_dir += flag_model_label;
+  str_weights_dir += "/weights/"; 
   command << "mkdir " << str_weights_dir; 
   system(command.str().c_str());
 
   command.str("");
   command.clear();
-  std::string str_representations_dir = str_expdir + "visualization/representations/"; 
+  std::string str_representations_dir = str_expdir + "visualization_";
+  str_representations_dir += flag_model_label;
+  str_representations_dir += "/representations/"; 
   command << "mkdir " << str_representations_dir; 
   system(command.str().c_str());
 
