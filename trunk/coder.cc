@@ -27,12 +27,14 @@
 namespace Torch {
 
 Coder::Coder(int n_inputs_, int n_outputs_, bool is_noisy_,
-             Coder *tied_coder_, bool is_transposed_, std::string nonlinearity_)
+              Coder *tied_coder_, bool is_transposed_, bool reparametrize_,
+              std::string nonlinearity_)
     : GradientMachine(n_inputs_, n_outputs_, 0)
 {
   is_noisy = is_noisy_;
   tied_coder = tied_coder_;
   is_transposed = is_transposed_;
+  reparametrize = reparametrize_;
   nonlinearity = nonlinearity_;
 
   // Build the underlying machines.
@@ -104,7 +106,7 @@ void Coder::BuildLinearLayer()
     else    {
       assert(n_inputs==tied_coder->n_outputs && n_outputs==tied_coder->n_inputs);
 
-      linear_layer = new(allocator) TransposedTiedLinear(n_inputs, n_outputs, tied_coder->linear_layer);
+      linear_layer = new(allocator) TransposedTiedLinear(n_inputs, n_outputs, tied_coder->linear_layer, reparametrize);
     }
   }
   // *** Weights are not tied ***

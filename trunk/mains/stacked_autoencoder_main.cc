@@ -79,6 +79,7 @@ int main(int argc, char **argv)
   int flag_n_hidden_units;
   int flag_n_speech;
   bool flag_tied_weights;
+  bool flag_reparametrize_tied;
   char *flag_nonlinearity;
   char *flag_recons_cost;
   real flag_corrupt_prob;
@@ -147,6 +148,7 @@ int main(int argc, char **argv)
   cmd.addRCmdOption("-corrupt_value", &flag_corrupt_value, 0.0, "value to corrupt autoencoder inputs to", true);
   cmd.addBCmdOption("-init_from_binners", &flag_init_from_binners, false, "if you want to init the model from binners");
   cmd.addSCmdOption("-binners_location", &flag_binners_location, "", "directory where to find the binners");
+  cmd.addBCmdOption("-reparametrize_tied", &flag_reparametrize_tied, false, "if you want to raparametrize the tied weights.");
 
   // Training
   cmd.addText("\nTraining options:");
@@ -216,6 +218,7 @@ int main(int argc, char **argv)
      << "-ns=" << flag_n_speech << "-cprob=" << flag_corrupt_prob
      << "-cval=" << flag_corrupt_value 
      << "-ifb=" << flag_init_from_binners
+     << "=rpmt=" << flag_reparametrize_tied
      << "-lwe=" << flag_max_iter_lwu << "-ue=" << flag_max_iter_uc
      << "-ace=" << flag_max_iter_ac << "-sce=" << flag_max_iter_sc
      << "-lwu=" << flag_lr_lwu 
@@ -288,7 +291,7 @@ int main(int argc, char **argv)
     Random::manualSeed((long)flag_model_seed);
   
   // Last two parameters: communication type and n_communication_layers
-  CommunicatingStackedAutoencoder csae("csae", flag_nonlinearity, flag_tied_weights, flag_n_inputs, flag_n_layers,
+  CommunicatingStackedAutoencoder csae("csae", flag_nonlinearity, flag_tied_weights, flag_reparametrize_tied, flag_n_inputs, flag_n_layers,
                                          units_per_hidden_layer, flag_n_classes,
                                          is_noisy, units_per_speech_layer,0,1);
   csae.setL1WeightDecay(flag_l1_decay);

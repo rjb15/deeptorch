@@ -41,6 +41,7 @@ class StackedAutoencoder : public ConnectedMachine
                                 // individuals in a population
     bool is_noisy;              // If True, use destructive layers in autoencoders
     bool tied_weights;          // Specifies if weights tied in autoencoders.
+    bool reparametrize_tied;
     std::string nonlinearity;        // Specifies which nonlinearity to use: 'sigmoid',
                                 // 'tanh' or 'nonlinear'
 
@@ -81,6 +82,7 @@ class StackedAutoencoder : public ConnectedMachine
     StackedAutoencoder(std::string name_,
                        std::string nonlinearity_,
                        bool tied_weights_,
+                       bool reparametrize_tied_,
                        int n_inputs_,
                        int n_hidden_layers_,
                        int *n_hidden_units_per_layer_,

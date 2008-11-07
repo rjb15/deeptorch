@@ -28,6 +28,7 @@ namespace Torch {
 StackedAutoencoder::StackedAutoencoder(std::string name_,
                                        std::string nonlinearity_,
                                        bool tied_weights_,
+                                       bool reparametrize_tied_,
                                        int n_inputs_,
                                        int n_hidden_layers_,
                                        int *n_units_per_hidden_layer_,
@@ -37,6 +38,7 @@ StackedAutoencoder::StackedAutoencoder(std::string name_,
   name = name_;
   is_noisy = is_noisy_;
   tied_weights = tied_weights_;
+  reparametrize_tied = reparametrize_tied_;
   nonlinearity = nonlinearity_;
 
   // the topology
@@ -73,7 +75,7 @@ void StackedAutoencoder::BuildCoders()
   encoders = (Coder**)allocator->alloc(sizeof(Coder*)*n_hidden_layers);
   for(int i=0; i<n_hidden_layers; i++) {
     encoders[i] = new(allocator) Coder(n_units_per_layer[i], n_units_per_layer[i+1],
-                                       false, NULL, false, nonlinearity);
+                                       false, NULL, false, false, nonlinearity);
   }
 
   // noisy encoder
@@ -83,7 +85,7 @@ void StackedAutoencoder::BuildCoders()
     for(int i=0; i<n_hidden_layers; i++) {
       noisy_encoders[i] = new(allocator)Coder(encoders[i]->n_inputs,
                                               encoders[i]->n_outputs,
-                                              true, encoders[i], false,
+                                              true, encoders[i], false, false,
                                               nonlinearity);
     }
   }
@@ -96,17 +98,17 @@ void StackedAutoencoder::BuildCoders()
     // decoder
     if(tied_weights)  {
       decoders[i] = new(allocator) Coder(encoders[i]->n_outputs, encoders[i]->n_inputs,
-                                         false, encoders[i], true, nonlinearity);
+                                         false, encoders[i], true, reparametrize_tied, nonlinearity);
     } else    {
       decoders[i] = new(allocator) Coder(encoders[i]->n_outputs, encoders[i]->n_inputs,
-                                         false, NULL, false, nonlinearity);
+                                         false, NULL, false, false, nonlinearity);
     }
   }
 
   // Outputer
   outputer = new(allocator) Coder(n_units_per_layer[n_hidden_layers],
                                   n_units_per_layer[n_hidden_layers+1],
-                                  false, NULL, false, "logsoftmax");
+                                  false, NULL, false, false, "logsoftmax");
 
 
 }

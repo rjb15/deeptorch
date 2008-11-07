@@ -30,9 +30,16 @@ class TransposedTiedLinear : public Linear
 {
   public:
 
+   // If the inputsize is different from the outputsize, then the weight
+   // initial values follow the initialization procedure from the base_linear's
+   // perspective but not from this Linear's perspective. We can reparametrize
+   // to accomodate both.
+   bool reparametrize;
+   real reparametrization_multiplier;
+
    Linear *base_linear;
 
-   TransposedTiedLinear(int n_inputs_, int n_outputs_, Linear* base_linear_);
+   TransposedTiedLinear(int n_inputs_, int n_outputs_, Linear* base_linear_, bool reparametrize_);
 
    //-----
    virtual void frameForward(int t, real *f_inputs, real *f_outputs);
