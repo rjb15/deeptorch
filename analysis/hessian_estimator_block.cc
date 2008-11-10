@@ -131,6 +131,8 @@ int main(int argc, char **argv)
         Vec sample(der_params->data[j], der_params->size[j]);
         estimators[j]->Observe(&sample);
       }
+
+      error("must clear gradient!");
  
       // Progress
       if ( (real)i/data.n_examples > tick/100.0)  {
