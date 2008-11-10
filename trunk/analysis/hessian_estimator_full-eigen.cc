@@ -13,10 +13,10 @@
 // limitations under the License.
 //
 const char *help = "\
-hessian_estimator_full\n\
+hessian_estimator_full-eigen\n\
 \n\
 This program estimates the hessian with the covariance approx.\n\
-and it produces 2 binary file containing its eigen vals vecs.\n";
+The covariance is fully computed and so is the eigendecomposition.\n";
 
 #include <string>
 #include <sstream>
@@ -76,8 +76,7 @@ int main(int argc, char **argv)
   MatDataSet matdata(flag_data_filename, flag_n_inputs, 1, false,
                                 flag_max_load, flag_binary_mode);
   ClassFormatDataSet data(&matdata,flag_n_classes);
-  OneHotClassFormat class_format(&data);  // Not sure about this... what if not
-                                          // all classes are in the test set?
+  OneHotClassFormat class_format(&data);
 
   // Load the model
   CommunicatingStackedAutoencoder *csae = LoadCSAE(allocator, flag_model_filename);
@@ -97,7 +96,7 @@ int main(int argc, char **argv)
   Mat *gradients = new(allocator) Mat(data.n_examples, n_params);
   Mat *covariance = new(allocator) Mat(n_params, n_params);
 
-  // Iterate over the data
+  // Set the dataset
   csae->setDataSet(&data);
   criterion.setDataSet(&data);
 
@@ -105,8 +104,8 @@ int main(int argc, char **argv)
   for(int i=0; i<der_params->n_data; i++)
     memset(der_params->data[i], 0, sizeof(real)*der_params->size[i]);
 
+  // Iterate over the data
   int tick = 1;
-
   for (int i=0; i<data.n_examples; i++)  {
     data.setExample(i);
 
@@ -121,12 +120,10 @@ int main(int argc, char **argv)
     real *ptr = gradients->ptr[i];
     for(int j=0; j<der_params->n_data; j++) {
       memcpy(ptr, der_params->data[j], der_params->size[j] * sizeof(real));
+      memset(der_params->data[j], 0, sizeof(real)*der_params->size[j]);
       ptr += der_params->size[j];
     }
 
-    for(int j=0; j<der_params->n_data; j++)
-      memset(der_params->data[j], 0, sizeof(real)*der_params->size[j]);
- 
     // Progress
     if ( (real)i/data.n_examples > tick/10.0)  {
       std::cout << ".";
@@ -145,9 +142,7 @@ int main(int argc, char **argv)
   mean_norm2 /= data.n_examples;
   std::cout << "mean_norm2 = " << mean_norm2 << std::endl;
 
-
-
-  // Compute the mean
+  // Compute the mean gradient
   message("Computing the mean of the gradients.");
   Vec *gradient_mean = new(allocator) Vec(n_params);
   for (int i=0; i<n_params; i++)
