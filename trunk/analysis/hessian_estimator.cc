@@ -136,6 +136,8 @@ int main(int argc, char **argv)
         offset += der_params->size[j];
       }
       estimator->Observe(&sample);
+
+      error("must clear gradient!");
  
       // Progress
       if ( (real)i/data.n_examples > tick/100.0)  {
