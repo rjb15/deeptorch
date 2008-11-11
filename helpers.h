@@ -21,6 +21,7 @@
 #include "MSEMeasurer.h"
 #include "ClassMeasurer.h"
 #include "ClassNLLMeasurer.h"
+#include "Machine.h"
 #include "Trainer.h"         // for MeasurerList!
 #include "MLP.h" // really?
 
@@ -42,7 +43,7 @@ DiskXFile* InitResultsFile(Allocator* allocator,std::string expdir, std::string 
 
 
 void AddClassificationMeasurers(Allocator* allocator, std::string expdir,
-                                MeasurerList *measurers, StackedAutoencoder *machine,
+                                MeasurerList *measurers, Machine *machine,
                                 DataSet *train, DataSet *valid, DataSet *test,
                                 ClassFormat *class_format, bool disk_results);
 
