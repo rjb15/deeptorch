@@ -34,7 +34,7 @@ DiskXFile* InitResultsFile(Allocator* allocator,std::string expdir, std::string 
 }
 
 void AddClassificationMeasurers(Allocator* allocator, std::string expdir,
-                                MeasurerList *measurers, StackedAutoencoder *machine,
+                                MeasurerList *measurers, Machine *machine,
                                 DataSet *train, DataSet *valid, DataSet *test,
                                 ClassFormat *class_format, bool disk_results)
 {
@@ -49,7 +49,8 @@ void AddClassificationMeasurers(Allocator* allocator, std::string expdir,
   // train
   ss.str("");
   ss.clear();
-  ss << expdir << machine->name << "_train_nll.txt";
+  //ss << expdir << machine->name << "_train_nll.txt";
+  ss << expdir << "train_nll.txt";
   if (disk_results) {
     DiskXFile *file_mentor_train_nll = new(allocator) DiskXFile(ss.str().c_str(),"w");
     tfile_mentor_train_nll = file_mentor_train_nll;
@@ -64,7 +65,8 @@ void AddClassificationMeasurers(Allocator* allocator, std::string expdir,
   measurers->addNode(measurer_mentor_train_nll);
   ss.str("");
   ss.clear();
-  ss << expdir << machine->name << "_train_class.txt";
+  //ss << expdir << machine->name << "_train_class.txt";
+  ss << expdir << "train_class.txt";
   if (disk_results) {
     DiskXFile *file_mentor_train_class = new(allocator) DiskXFile(ss.str().c_str(),"w");
     tfile_mentor_train_class = file_mentor_train_class;
@@ -80,7 +82,8 @@ void AddClassificationMeasurers(Allocator* allocator, std::string expdir,
   // valid
   ss.str("");
   ss.clear();
-  ss << expdir << machine->name << "_valid_nll.txt";
+  //ss << expdir << machine->name << "_valid_nll.txt";
+  ss << expdir << "valid_nll.txt";
 
   if (disk_results) {
     DiskXFile *file_mentor_valid_nll = new(allocator) DiskXFile(ss.str().c_str(),"w");
@@ -96,7 +99,8 @@ void AddClassificationMeasurers(Allocator* allocator, std::string expdir,
   measurers->addNode(measurer_mentor_valid_nll);
   ss.str("");
   ss.clear();
-  ss << expdir << machine->name << "_valid_class.txt";
+  //ss << expdir << machine->name << "_valid_class.txt";
+  ss << expdir << "valid_class.txt";
 
   if (disk_results) {
     DiskXFile *file_mentor_valid_class = new(allocator) DiskXFile(ss.str().c_str(),"w");
@@ -113,7 +117,8 @@ void AddClassificationMeasurers(Allocator* allocator, std::string expdir,
   // test
   ss.str("");
   ss.clear();
-  ss << expdir << machine->name << "_test_nll.txt";
+  //ss << expdir << machine->name << "_test_nll.txt";
+  ss << expdir << "test_nll.txt";
   if (disk_results) {
     DiskXFile *file_mentor_test_nll = new(allocator) DiskXFile(ss.str().c_str(),"w");
     tfile_mentor_test_nll = file_mentor_test_nll;
@@ -128,7 +133,8 @@ void AddClassificationMeasurers(Allocator* allocator, std::string expdir,
   measurers->addNode(measurer_mentor_test_nll);
   ss.str("");
   ss.clear();
-  ss << expdir << machine->name << "_test_class.txt";
+  //ss << expdir << machine->name << "_test_class.txt";
+  ss << expdir << "test_class.txt";
   
   if (disk_results) {
     DiskXFile *file_mentor_test_class = new(allocator) DiskXFile(ss.str().c_str(),"w");
