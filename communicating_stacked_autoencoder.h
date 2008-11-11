@@ -76,6 +76,7 @@ class CommunicatingStackedAutoencoder : public StackedAutoencoder
                                     int *n_hidden_units_per_layer_,
                                     int n_outputs_,
                                     bool is_noisy_,
+                                    bool first_layer_smoothed_,
                                     int *n_speech_units_,
                                     int communication_type,
                                     int n_communication_layers);

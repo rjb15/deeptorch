@@ -86,6 +86,8 @@ int main(int argc, char **argv)
   real flag_corrupt_value;
   bool flag_init_from_binners;
   char *flag_binners_location;
+  bool flag_first_layer_smoothed;
+  real flag_smoothing_decay;
 
   // --- Training ---
   int flag_max_iter_lwu;
@@ -148,7 +150,9 @@ int main(int argc, char **argv)
   cmd.addRCmdOption("-corrupt_value", &flag_corrupt_value, 0.0, "value to corrupt autoencoder inputs to", true);
   cmd.addBCmdOption("-init_from_binners", &flag_init_from_binners, false, "if you want to init the model from binners");
   cmd.addSCmdOption("-binners_location", &flag_binners_location, "", "directory where to find the binners");
-  cmd.addBCmdOption("-reparametrize_tied", &flag_reparametrize_tied, false, "if you want to raparametrize the tied weights.");
+  cmd.addBCmdOption("-reparametrize_tied", &flag_reparametrize_tied, false, "if you want to reparametrize the tied weights.");
+  cmd.addBCmdOption("-first_layer_smoothed", &flag_first_layer_smoothed, false, "if you want to have a smoothing weight decay on the 1st layer.");
+  cmd.addRCmdOption("-smoothing_decay", &flag_smoothing_decay, 0.0, "Smoothing weight decay.");
 
   // Training
   cmd.addText("\nTraining options:");
@@ -218,7 +222,9 @@ int main(int argc, char **argv)
      << "-ns=" << flag_n_speech << "-cprob=" << flag_corrupt_prob
      << "-cval=" << flag_corrupt_value 
      << "-ifb=" << flag_init_from_binners
-     << "=rpmt=" << flag_reparametrize_tied
+     << "-rpmt=" << flag_reparametrize_tied
+     << "-fls=" << flag_first_layer_smoothed
+     << "-sdk=" << flag_smoothing_decay
      << "-lwe=" << flag_max_iter_lwu << "-ue=" << flag_max_iter_uc
      << "-ace=" << flag_max_iter_ac << "-sce=" << flag_max_iter_sc
      << "-lwu=" << flag_lr_lwu 
@@ -293,11 +299,12 @@ int main(int argc, char **argv)
   // Last two parameters: communication type and n_communication_layers
   CommunicatingStackedAutoencoder csae("csae", flag_nonlinearity, flag_tied_weights, flag_reparametrize_tied, flag_n_inputs, flag_n_layers,
                                          units_per_hidden_layer, flag_n_classes,
-                                         is_noisy, units_per_speech_layer,0,1);
+                                         is_noisy, flag_first_layer_smoothed, units_per_speech_layer,0,1);
   csae.setL1WeightDecay(flag_l1_decay);
   csae.setL2WeightDecay(flag_l2_decay);
   csae.setBiasDecay(flag_bias_decay);
   csae.setDestructionOptions(flag_corrupt_prob, flag_corrupt_value);
+  csae.setSmoothingDecay(flag_smoothing_decay);
 
   message("Models instanciated.\n");
 

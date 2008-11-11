@@ -38,8 +38,10 @@ void LoadDirections(char *directions_filename, int n_directions, Mat *directions
       token_count++;
     }
 
-    if (token_count!=directions->n)
+    if (token_count!=directions->n) {
+      std::cout << token_count << " params loaded" << std::endl;
       error("LoadDirections(...) - error while loading a direction!");
+    }
   }
 
   // Close file
