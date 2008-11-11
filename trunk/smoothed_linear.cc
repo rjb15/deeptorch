@@ -13,11 +13,17 @@
 // limitations under the License.
 //
 #include "smoothed_linear.h"
+#include <cassert>
 
 namespace Torch {
 
 SmoothedLinear::SmoothedLinear(int n_inputs_, int n_outputs_) : Linear(n_inputs_, n_outputs_)
 {
+  warning("SmoothedLinear - Assuming input is a square image!");
+  input_sub_unit_size = (int) sqrt(n_inputs);
+  input_n_sub_units = input_sub_unit_size;
+  assert( (input_sub_unit_size*input_n_sub_units) == n_inputs);
+
   addROption("smoothing weight decay", &smoothing_weight_decay, 0., "smoothing weight decay");
 }
 
@@ -30,44 +36,51 @@ void SmoothedLinear::frameBackward(int t, real *f_inputs, real *beta_, real *f_o
     real *src_ = params->data[0];
     real *dest_ = der_params->data[0];
 
-    int n_weights = n_inputs*n_outputs;
+    int offset=0;
 
-    for(int i=0; i<n_weights; i++) {
-      // not considering the equal cases...
-      // from left 
-      if ((i%n_inputs) != 0) { // not on W(:,0)
-        if(src_[i]<src_[i-1])
-          dest_[i] += smoothing_weight_decay;
-        else
-          dest_[i] -= smoothing_weight_decay;
+    for(int i=0; i<n_outputs; i++) {
+      for (int j=0; j<input_n_sub_units; j++) {
+        for (int k=0; k<input_sub_unit_size; k++) {
+
+          // not considering the equal cases...
+          // from left - not when k==0
+          if (k) {
+            if(src_[offset]<src_[offset-1])
+              dest_[offset] += smoothing_weight_decay;
+            else
+              dest_[offset] -= smoothing_weight_decay;
+          }
+
+          // from right
+          if (k != (input_sub_unit_size-1)) { // not on right border
+            if(src_[offset]<src_[offset+1])
+              dest_[offset] += smoothing_weight_decay;
+            else
+              dest_[offset] -= smoothing_weight_decay;
+          }
+
+          // from top
+          if (j) { // not on top border
+            if(src_[offset]<src_[offset-input_sub_unit_size])
+              dest_[offset] += smoothing_weight_decay;
+            else
+              dest_[offset] -= smoothing_weight_decay;
+          }
+
+          // from bottom
+          if (j<input_n_sub_units-1) { // not on bottom border 
+            if(src_[offset]<src_[offset+input_sub_unit_size])
+              dest_[offset] += smoothing_weight_decay;
+            else
+              dest_[offset] -= smoothing_weight_decay;
+          }
+
+          //
+          offset++;
+        }
       }
-      // from right
-      if ((i%n_inputs) != (n_inputs-1)) { // not on W(:,n_inputs-1)
-        if(src_[i]<src_[i+1])
-          dest_[i] += smoothing_weight_decay;
-        else
-          dest_[i] -= smoothing_weight_decay;
-      }
-
-      // from top
-      if (i >= n_inputs) { // not on W(0,:)
-        if(src_[i]<src_[i-n_inputs])
-          dest_[i] += smoothing_weight_decay;
-        else
-          dest_[i] -= smoothing_weight_decay;
-      }
-
-      // from bottom
-      if (i<n_weights-n_inputs) { // not on W(,:)
-        if(src_[i]<src_[i+n_inputs])
-          dest_[i] += smoothing_weight_decay;
-        else
-          dest_[i] -= smoothing_weight_decay;
-      }
-
-    }
-  }
-
+    } // for n_outputs
+  } // if
 }
 
 SmoothedLinear::~SmoothedLinear()
