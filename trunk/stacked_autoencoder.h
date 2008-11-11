@@ -44,6 +44,7 @@ class StackedAutoencoder : public ConnectedMachine
     bool reparametrize_tied;
     std::string nonlinearity;        // Specifies which nonlinearity to use: 'sigmoid',
                                 // 'tanh' or 'nonlinear'
+    bool first_layer_smoothed;
 
     int n_hidden_layers;
     int *n_units_per_layer;     // size is n_hidden_layers + 2
@@ -87,7 +88,8 @@ class StackedAutoencoder : public ConnectedMachine
                        int n_hidden_layers_,
                        int *n_hidden_units_per_layer_,
                        int n_outputs_,
-                       bool is_noisy=false);
+                       bool is_noisy_,
+                       bool first_layer_smoothed_);
 
     //
     virtual void AddCoreMachines(ConnectedMachine* mch);
@@ -104,6 +106,7 @@ class StackedAutoencoder : public ConnectedMachine
     virtual void setL2WeightDecay(real weight_decay);
     virtual void setBiasDecay(real bias_decay);
     virtual void setDestructionOptions(real destruct_prob, real destruct_value);
+    virtual void setSmoothingDecay(real smoothing_decay);
 
     // Saves-loads the parameters. Currently the rest of the save is in
     // helpers (the topology).

@@ -14,14 +14,9 @@
 //
 #include "stacked_autoencoder.h"
 #include "Linear.h"
-//#include "Tanh.h"
-//#include "Sigmoid.h"
-//#include "LogSoftMax.h"
 #include "identity.h"
-//#include "transposed_tied_linear.h"
 #include "destructive.h"
-//#include "nonlinear.h"
-//#include "coder.h"
+#include "smoothed_linear.h"
 
 namespace Torch {
 
@@ -33,13 +28,15 @@ StackedAutoencoder::StackedAutoencoder(std::string name_,
                                        int n_hidden_layers_,
                                        int *n_units_per_hidden_layer_,
                                        int n_outputs_,
-                                       bool is_noisy_)
+                                       bool is_noisy_,
+                                       bool first_layer_smoothed_)
 {
   name = name_;
   is_noisy = is_noisy_;
   tied_weights = tied_weights_;
   reparametrize_tied = reparametrize_tied_;
   nonlinearity = nonlinearity_;
+  first_layer_smoothed = first_layer_smoothed_;
 
   // the topology
   n_hidden_layers = n_hidden_layers_;
@@ -74,8 +71,13 @@ void StackedAutoencoder::BuildCoders()
   // encoders
   encoders = (Coder**)allocator->alloc(sizeof(Coder*)*n_hidden_layers);
   for(int i=0; i<n_hidden_layers; i++) {
-    encoders[i] = new(allocator) Coder(n_units_per_layer[i], n_units_per_layer[i+1],
-                                       false, NULL, false, false, nonlinearity);
+    if (i==0  && first_layer_smoothed) {
+      encoders[i] = new(allocator) Coder(n_units_per_layer[i], n_units_per_layer[i+1],
+                                       false, NULL, false, false, nonlinearity, true);
+    } else  {
+      encoders[i] = new(allocator) Coder(n_units_per_layer[i], n_units_per_layer[i+1],
+                                       false, NULL, false, false, nonlinearity, false);
+    }
   }
 
   // noisy encoder
@@ -278,6 +280,14 @@ void StackedAutoencoder::setDestructionOptions(real destruct_prob, real destruct
       noisy_encoders[i]->destructive_layer->setROption("Destruction probability", destruct_prob);
       noisy_encoders[i]->destructive_layer->setROption("Destruction value", destruct_value);
     }
+  }
+}
+
+void StackedAutoencoder::setSmoothingDecay(real smoothing_decay)
+{
+  if (first_layer_smoothed) {
+    SmoothedLinear *sl = (SmoothedLinear*) encoders[0]->linear_layer;
+    sl->setROption("smoothing weight decay", smoothing_decay);
   }
 }
 

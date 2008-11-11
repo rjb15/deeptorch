@@ -32,12 +32,13 @@ CommunicatingStackedAutoencoder::CommunicatingStackedAutoencoder(std::string nam
                                                                  int *n_hidden_units_per_layer_,
                                                                  int n_outputs_,
                                                                  bool is_noisy_,
+                                                                 bool first_layer_smoothed_,
                                                                  int *n_speech_units_,
                                                                  int communication_type_,
                                                                  int n_communication_layers_)
     : StackedAutoencoder( name_, nonlinearity_, tied_weights_, reparametrize_tied_, n_inputs_,
                           n_hidden_layers_, n_hidden_units_per_layer_, n_outputs_,
-                          is_noisy_)
+                          is_noisy_, first_layer_smoothed_)
 {
   if (reparametrize_tied_)
     warning("Tied weight reparametrization not handled for communicating part!");

@@ -23,12 +23,13 @@
 #include "destructive.h"
 #include "transposed_tied_linear.h"
 #include "nonlinear.h"
+#include "smoothed_linear.h"
 
 namespace Torch {
 
 Coder::Coder(int n_inputs_, int n_outputs_, bool is_noisy_,
               Coder *tied_coder_, bool is_transposed_, bool reparametrize_,
-              std::string nonlinearity_)
+              std::string nonlinearity_, bool layer_smoothed_)
     : GradientMachine(n_inputs_, n_outputs_, 0)
 {
   is_noisy = is_noisy_;
@@ -36,6 +37,7 @@ Coder::Coder(int n_inputs_, int n_outputs_, bool is_noisy_,
   is_transposed = is_transposed_;
   reparametrize = reparametrize_;
   nonlinearity = nonlinearity_;
+  layer_smoothed = layer_smoothed_;
 
   // Build the underlying machines.
   BuildDestructiveLayer();
@@ -88,6 +90,7 @@ void Coder::BuildLinearLayer()
   if(tied_coder)        {
     if(!is_transposed)   {
       assert(n_inputs==tied_coder->n_inputs && n_outputs==tied_coder->n_outputs);
+      assert(!layer_smoothed);
 
       // Build a new Linear but have it share the tied coder's weights.
       linear_layer = new(allocator) Linear(n_inputs, n_outputs);
@@ -105,6 +108,7 @@ void Coder::BuildLinearLayer()
     // The weights are transposed
     else    {
       assert(n_inputs==tied_coder->n_outputs && n_outputs==tied_coder->n_inputs);
+      assert(!layer_smoothed);
 
       linear_layer = new(allocator) TransposedTiedLinear(n_inputs, n_outputs, tied_coder->linear_layer, reparametrize);
     }
@@ -112,7 +116,10 @@ void Coder::BuildLinearLayer()
   // *** Weights are not tied ***
   else    {
     if(!is_transposed)   {
-       linear_layer = new(allocator) Linear(n_inputs, n_outputs);
+      if (layer_smoothed)
+        linear_layer = new(allocator) SmoothedLinear(n_inputs, n_outputs);
+      else
+        linear_layer = new(allocator) Linear(n_inputs, n_outputs);
     }   else    {
       error("Coder::Coder(...) - weights cannot be transposed unless tied (no code for it)!");
     }

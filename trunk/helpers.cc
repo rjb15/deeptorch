@@ -480,13 +480,14 @@ CommunicatingStackedAutoencoder* LoadCSAE(Allocator* allocator, std::string file
   // ------
 
   warning("should do a lean construction of csae here...");
+  warning("Ignoring first_layer_smoothed's value");
   // Are the autoencoders noisy?
   bool is_noisy = false;
   if(corrupt_prob>0.0)
     is_noisy = true;
   csae = new(allocator) CommunicatingStackedAutoencoder("csae", nonlinearity, tied_weights, reparametrize_tied, n_inputs,
               n_layers, units_per_hidden_layer, n_classes,
-              is_noisy, units_per_speech_layer,  communication_type, n_communication_layers);
+              is_noisy, false, units_per_speech_layer,  communication_type, n_communication_layers);
 
   csae->loadXFile(m);
 
