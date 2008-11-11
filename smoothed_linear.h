@@ -20,10 +20,13 @@
 namespace Torch {
 
 // A modified Linear Layer with a weight decay that tries to maintain
-// neighbouring weights (in the weight matrix) close.
+// neighbouring weights of a neuron close. Assumes the input is a square
+// (NxN) image.
 class SmoothedLinear : public Linear
 {
   public:
+    int input_sub_unit_size;
+    int input_n_sub_units;
     real smoothing_weight_decay;
 
     ///
