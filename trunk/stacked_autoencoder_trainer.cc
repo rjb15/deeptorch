@@ -274,6 +274,9 @@ void StackedAutoencoderTrainer::TrainUnsupLayerwise()
 
 void StackedAutoencoderTrainer::TrainUnsupLayer()
 {
+  assert(layerwise_training); // this will set appropriate behavior for the fprop
+                              // and bprop (only bprop top autoencoder)
+
   // Inform user of what's going on!
   std::stringstream ss;
   ss << sae->name << " : unsupervised training of layer " << layerwise_layer
