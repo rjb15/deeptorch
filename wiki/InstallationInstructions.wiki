@@ -3,7 +3,7 @@
 
 = If you have never used Torch3 =
 
-  * Download the [http://deeptorch.googlecode.com/files/Torch_and_deeptorch_current_release.tar.gz archive] containing Torch3 and deeptorch source code.
+  * Download the [http://deeptorch.googlecode.com/files/Torch3_and_deeptorch_0.1_release.tar.gz archive] containing Torch3 and deeptorch source code.
   * Read carefully the Torch3 installation [http://www.torch.ch/documentation.php instructions]
   * Modify the provided `Linux.cfg` configuration file to add the packages from torch that you need (including `deeptorch`, presumably).
   * Run `xmake` as per the Torch3 installation instructions.
