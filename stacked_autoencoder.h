@@ -93,6 +93,7 @@ class StackedAutoencoder : public ConnectedMachine
 
     //
     virtual void AddCoreMachines(ConnectedMachine* mch);
+    virtual void AddEncodersUpToIncluded(ConnectedMachine* mch, int index_up_to_included, bool add_input_handle);
     virtual void AddUnsupMachines(ConnectedMachine* mch);
     virtual void BuildCoders();
     virtual void BuildAutoencoders();

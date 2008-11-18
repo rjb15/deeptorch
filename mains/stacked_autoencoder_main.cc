@@ -413,7 +413,8 @@ int main(int argc, char **argv)
     flags[2] = flag_pretrain_layer_3;
     flags[3] = flag_pretrain_layer_4;
 
-    csae_trainer.TrainSelectiveUnsupLayerwise(flags);
+    //csae_trainer.TrainSelectiveUnsupLayerwise(flags);
+    csae_trainer.TrainSelectiveUnsup(flags);
 
   }
 

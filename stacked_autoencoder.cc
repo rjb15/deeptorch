@@ -182,6 +182,29 @@ void StackedAutoencoder::AddCoreMachines(ConnectedMachine* mch)
   }
 }
 
+void StackedAutoencoder::AddEncodersUpToIncluded(ConnectedMachine* mch, int index_up_to_included, bool add_input_handle)
+{
+  for(int i=0; i<index_up_to_included+1; i++) {
+    mch->addMachine(encoders[i]);
+    // connect it, unless it's on the first layer
+    if(i>0)     {
+      mch->connectOn(encoders[i-1]);
+    }
+    // See motivation for input_handle_machine in the header...
+    if(i==0 && add_input_handle)  {
+      mch->addMachine(input_handle_machine);
+    }
+    mch->addLayer();
+  }
+
+  // in the case where noisy and index_up_to_included is -1, we still put the input_handle_machine
+  if (index_up_to_included<0 && add_input_handle) {
+    mch->addMachine(input_handle_machine);
+    mch->addLayer();
+  }
+
+}
+
 void StackedAutoencoder::AddUnsupMachines(ConnectedMachine* mch)
 {
   for(int i=0; i<n_hidden_layers; i++) {

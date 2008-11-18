@@ -295,6 +295,115 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsupLayerwise(int* pretrain_list)
   layerwise_training = false;
 }
 
+void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list)
+{
+  // Find the topmost trained layer
+  int index_topmost_trained = -1;
+  int n_layers_to_train = 0;
+  for (int i=0; i<sae->n_hidden_layers; i++)  {
+    if (pretrain_list[i]==1)  {
+      index_topmost_trained = i;
+      n_layers_to_train++;
+    }
+  }
+  if (index_topmost_trained<0)  {
+    warning("StackedAutoencoderTrainer::TrainSelectiveUnsup - no layer to pretrain!");
+  }
+
+  // Build the machine
+  ConnectedMachine *selective_machine = new(allocator) ConnectedMachine();
+  // start by adding the encoders
+  if (!sae->is_noisy)
+    sae->AddEncodersUpToIncluded(selective_machine, index_topmost_trained, false);
+  else  {
+    // We only need the input_handle_machine if the first layer is pretrained (if
+    // we need to connect the autoencoder to it)
+    if (pretrain_list[0]==1)
+      sae->AddEncodersUpToIncluded(selective_machine, index_topmost_trained-1, true);
+    else
+      sae->AddEncodersUpToIncluded(selective_machine, index_topmost_trained-1, false);
+  }
+  // now add the decoders
+  for (int i=0; i<sae->n_hidden_layers; i++)  {
+    if (pretrain_list[i]==1)  {
+      // Just plug the decoder into its (non-noisy) encoder
+      if(!sae->is_noisy)  {
+       selective_machine->addMachine(sae->decoders[i]);
+       selective_machine->connectOn(sae->encoders[i]);
+      // Use the autoencoder (it's noisy)
+      }     else    {
+        // if not the first layer, connect (noisy) autoencoder to lower encoder
+        if(i>0) {
+          selective_machine->addMachine(sae->autoencoders[i]);
+          selective_machine->connectOn(sae->encoders[i-1]);
+        } else  {
+          // The first layer requires a special procedure, actually a big hack. The
+          // reason is it can't be connected on the input. It must be added on the
+          // first layer.
+          selective_machine->addMachine(sae->autoencoders[i]);
+          selective_machine->connectOn((GradientMachine*)sae->input_handle_machine);
+        }
+      }
+    }
+  }
+  // build the machine
+  selective_machine->build();
+
+  std::stringstream ss;
+  ss << sae->name << " : selectively training with unsupervised costs - not training the outputer.";
+  message(ss.str().c_str());
+
+  // *** Set up a ConcatCriterion
+  Criterion **the_criterions = (Criterion **) allocator->alloc(sizeof(Criterion*)*(n_layers_to_train));
+
+  // Set the criterions (the unsup criterions already have their dataset set
+  // so no need to set it).
+  int offset = 0;
+  for(int i=0; i<sae->n_hidden_layers; i++)     {
+    if (pretrain_list[i]==1)  {
+      the_criterions[offset] = unsup_criterions[i];
+      offset++;
+    }
+  }
+
+  // The concat_criterion
+  // NOT applying any weights to the criteria.
+  Criterion *concat_criterion;
+  concat_criterion = new(allocator) ConcatCriterion(selective_machine->n_outputs,
+                                                 n_layers_to_train,
+                                                 the_criterions,
+                                                 NULL);
+  // *** Measurers
+  // See the header for the explanation of this.
+  MeasurerList the_measurers;
+
+  // The unsupervised Measurers all have "train DataSets".
+  for(int i=0; i<sae->n_hidden_layers; i++)   {
+    if (pretrain_list[i]==1)  {
+      // use of unsup_datasets[0] is HACK RELATED - see below
+      FakeDataMeasurer *faker_measurer = new(allocator) FakeDataMeasurer(unsup_datasets[0], unsup_measurers[i]);
+      the_measurers.addNode(faker_measurer);
+    }
+  }
+
+  // --- Set up a trainer and train ---
+  machine = selective_machine;
+  criterion = concat_criterion;
+
+  // Calling setExample on unsup_datasets[0] will call it for supervised_train_data also.
+  train(unsup_datasets[0], &the_measurers);
+
+  machine = sae;
+  criterion = sup_criterion;
+
+  // free up
+  allocator->free(selective_machine);
+  allocator->free(the_criterions);
+  allocator->free(concat_criterion);
+  for (int i = 0; i < the_measurers.n_nodes; i++)
+    allocator->free(the_measurers.nodes[i]);
+
+}
 
 void StackedAutoencoderTrainer::TrainUnsupLayer()
 {
