@@ -139,8 +139,11 @@ void StackedAutoencoder::BuildMesdMachines()
   for(int i=0; i<n_hidden_layers; i++) {
     mesd_machines[i] = new(allocator)ConnectedMachine();
 
-    for(int j=0; j<i+1; j++)
+    for(int j=0; j<i; j++)
       mesd_machines[i]->addFCL(encoders[j]);
+
+    if (is_noisy)
+      mesd_machines[i]->addFCL(noisy_encoders[i]);
 
     mesd_machines[i]->addFCL(decoders[i]);
     mesd_machines[i]->build();
