@@ -122,6 +122,12 @@ int main(int argc, char **argv)
   bool flag_single_results_file;
   bool flag_multiple_results_files;
 
+  bool flag_selective_layerwise_pretraining;
+  int flag_pretrain_layer_1;
+  int flag_pretrain_layer_2;
+  int flag_pretrain_layer_3;
+  int flag_pretrain_layer_4;
+
   // Construct the command line
   CmdLine cmd;
 
@@ -187,6 +193,12 @@ int main(int argc, char **argv)
   cmd.addBCmdOption("save_outputs", &flag_save_outputs, true, "if true, save the model's outputs on the datasets.", true);
   cmd.addBCmdOption("single_results_file", &flag_single_results_file, false, "if true, saves the results into a single file (1 for sup, 1 for unsup, 1 for supunsup)", true);
   cmd.addBCmdOption("multiple_results_files", &flag_multiple_results_files, true, "if true, save results into different files, depending on the cost", true);
+  cmd.addBCmdOption("selective_layerwise_pretraining", &flag_selective_layerwise_pretraining, false, "if true, only the layers specified by pretrain_layer_N will be pretrained (layerwise!)", true);
+
+  cmd.addICmdOption("-pretrain_layer_1", &flag_pretrain_layer_1, 0, "1 = pretrain the 1st layer ", true);
+  cmd.addICmdOption("-pretrain_layer_2", &flag_pretrain_layer_2, 0, "1 = pretrain the 2nd layer ", true);
+  cmd.addICmdOption("-pretrain_layer_3", &flag_pretrain_layer_3, 0, "1 = pretrain the 3rd layer ", true);
+  cmd.addICmdOption("-pretrain_layer_4", &flag_pretrain_layer_4, 0, "1 = pretrain the 4th layer ", true);
 
   // Read the command line
   cmd.read(argc, argv);
@@ -220,14 +232,16 @@ int main(int argc, char **argv)
      << "-nhu=" << flag_n_hidden_units
      << "-tied=" << flag_tied_weights << "-nlin=" << flag_nonlinearity << "-recost=" << flag_recons_cost
      << "-ns=" << flag_n_speech << "-cprob=" << flag_corrupt_prob
+     << "-ue=" << flag_max_iter_uc
      << "-cval=" << flag_corrupt_value 
      << "-ifb=" << flag_init_from_binners
      << "-rpmt=" << flag_reparametrize_tied
      << "-fls=" << flag_first_layer_smoothed
      << "-sdk=" << flag_smoothing_decay
-     << "-lwe=" << flag_max_iter_lwu << "-ue=" << flag_max_iter_uc
+     << "-lwe=" << flag_max_iter_lwu 
      << "-ace=" << flag_max_iter_ac << "-sce=" << flag_max_iter_sc
      << "-lwu=" << flag_lr_lwu 
+     << "-pre=" << flag_pretrain_layer_1  << flag_pretrain_layer_2 << flag_pretrain_layer_3 << flag_pretrain_layer_4 
      << "-lru=" << flag_lr_unsup << "-lrsu=" << flag_lr_supunsup << "-lrs=" << flag_lr_sup
      << "-dc=" << flag_lrate_decay << "-l1=" << flag_l1_decay
      << "-l2=" << flag_l2_decay << "-bdk=" << flag_bias_decay
@@ -370,7 +384,7 @@ int main(int argc, char **argv)
               &csae);
   }
   // --- train using the layerwise unsupervised criterions ---
-  if(flag_max_iter_lwu) {
+  if(flag_max_iter_lwu && !flag_selective_layerwise_pretraining) {
     csae_trainer.setROption("learning rate", flag_lr_lwu);
     csae_trainer.setIOption("max iter", flag_max_iter_lwu);
  
@@ -380,6 +394,26 @@ int main(int argc, char **argv)
     }
 
     csae_trainer.TrainUnsupLayerwise();
+
+  }
+
+  if(flag_selective_layerwise_pretraining) {
+    csae_trainer.setROption("learning rate", flag_lr_lwu);
+    csae_trainer.setIOption("max iter", flag_max_iter_lwu);
+ 
+    if (flag_single_results_file) {
+      resultsfile = InitResultsFile(allocator,expdir,"unsup");
+      csae_trainer.resultsfile = resultsfile;
+    }
+
+    int flags[flag_n_layers];
+
+    flags[0] = flag_pretrain_layer_1;
+    flags[1] = flag_pretrain_layer_2;
+    flags[2] = flag_pretrain_layer_3;
+    flags[3] = flag_pretrain_layer_4;
+
+    csae_trainer.TrainSelectiveUnsupLayerwise(flags);
 
   }
 
