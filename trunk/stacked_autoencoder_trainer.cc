@@ -272,6 +272,30 @@ void StackedAutoencoderTrainer::TrainUnsupLayerwise()
   layerwise_training = false;
 }
 
+void StackedAutoencoderTrainer::TrainSelectiveUnsupLayerwise(int* pretrain_list)
+{
+
+  layerwise_training = true;
+
+  for(int i=0; i<sae->n_hidden_layers; i++)     {
+    std::stringstream ss;
+    if (pretrain_list[i]==1)  {
+       ss << sae->name << " : (selective) unsupervised training of layer " << layerwise_layer << ". No bprop to lower layers.";
+       message(ss.str().c_str());
+       layerwise_layer = i;
+       TrainUnsupLayer();
+    }
+    else {
+       ss << sae->name << " : NO Unsupervised training of layer " << layerwise_layer << "!!";
+       message(ss.str().c_str());
+    }
+
+  }
+
+  layerwise_training = false;
+}
+
+
 void StackedAutoencoderTrainer::TrainUnsupLayer()
 {
   assert(layerwise_training); // this will set appropriate behavior for the fprop

@@ -107,6 +107,7 @@ class StackedAutoencoderTrainer : public StochasticGradientPlus
     virtual void IterFinalize();
     virtual void fpropbprop(DataSet *data);
 
+    virtual void TrainSelectiveUnsupLayerwise(int* pretrain_list);
     virtual void TrainUnsupLayerwise();
     virtual void TrainUnsupLayer();
     virtual void TrainOutputLayer(DataSet *supervised_train_data,
