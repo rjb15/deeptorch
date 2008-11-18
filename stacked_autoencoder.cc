@@ -144,6 +144,8 @@ void StackedAutoencoder::BuildMesdMachines()
 
     if (is_noisy)
       mesd_machines[i]->addFCL(noisy_encoders[i]);
+    else
+      mesd_machines[i]->addFCL(encoders[i]);
 
     mesd_machines[i]->addFCL(decoders[i]);
     mesd_machines[i]->build();
