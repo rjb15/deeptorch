@@ -207,11 +207,29 @@ void StackedAutoencoder::AddUnsupMachines(ConnectedMachine* mch)
 
 }
 
+// In the noisy case, we musn't add the last encoder as it does not get used.
+// This would cause a segfault in ConnectedMachine during backprop, because the
+// node would have no alpha_links.
 void StackedAutoencoder::BuildUnsupMachine()
 {
   unsup_machine = new(allocator) ConnectedMachine();
 
-  AddCoreMachines(unsup_machine);
+  // Add the encoders, but not the last one in the noisy case
+  for(int i=0; i<n_hidden_layers; i++) {
+    if ( (i<n_hidden_layers-1) || !is_noisy ) {
+      unsup_machine->addMachine(encoders[i]);
+      // connect it, unless it's on the first layer
+      if(i>0)     {
+        unsup_machine->connectOn(encoders[i-1]);
+      }
+      // See motivation for input_handle_machine in the header...
+      if(i==0 && is_noisy)  {
+        unsup_machine->addMachine(input_handle_machine);
+      }
+      unsup_machine->addLayer();
+    }
+  }
+
   AddUnsupMachines(unsup_machine);
 
   unsup_machine->build();
