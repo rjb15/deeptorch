@@ -91,6 +91,8 @@ void BuildSaeComContentDatasetsCriteriaMeasurers(Allocator *allocator,
                                           int n_communication_layers);
 
 
+void SaveCoder(std::string expdir, std::string filename, Coder *coder);
+Coder* LoadCoder(Allocator* allocator, std::string filename);
 
 void SaveCSAE(std::string expdir, std::string type, int n_layers, int n_inputs, int *units_per_hidden_layer, int *units_per_speech_layer,
               int n_classes,
