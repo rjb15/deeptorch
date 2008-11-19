@@ -15,8 +15,8 @@
 const char *help = "\
 hessian_estimator_full-eigen\n\
 \n\
-This program estimates the hessian with the covariance approx.\n\
-The covariance is fully computed and so is the eigendecomposition.\n";
+This program computes the full eigendecomposition of the covariance\n\
+of the gradients on a model's parameters.\n";
 
 #include <string>
 #include <sstream>
@@ -33,9 +33,11 @@ The covariance is fully computed and so is the eigendecomposition.\n";
 #include "ClassNLLCriterion.h"
 #include "matrix.h"
 #include "Parameters.h"
+#include "GradientMachine.h"
 #include "communicating_stacked_autoencoder.h"
 #include "pca_estimator.h"
 #include "helpers.h"
+#include "analysis_utilities.h"
 
 using namespace Torch;
 
@@ -50,6 +52,8 @@ int main(int argc, char **argv)
   int flag_n_classes;
   char *flag_data_filename;
   char *flag_model_filename;
+  char *flag_model_type;
+  char *flag_criterion_type;
 
   char *flag_model_label;
   int flag_max_load;
@@ -62,6 +66,8 @@ int main(int argc, char **argv)
   cmd.addICmdArg("-n_classes", &flag_n_classes, "number of targets");
   cmd.addSCmdArg("-data_filename", &flag_data_filename, "Filename for the data.");
   cmd.addSCmdArg("-model_filename", &flag_model_filename, "the model filename");
+  cmd.addSCmdArg("-model_type", &flag_model_type, "the type of the model: csae or linear.");
+  cmd.addSCmdArg("-criterion_type", &flag_criterion_type, "the type of the criterion: 'mse' or 'class-nll'.");
 
   cmd.addSCmdOption("-model_label", &flag_model_label, "", "label used to describe the model", true);
   cmd.addICmdOption("-max_load", &flag_max_load, -1, "max number of examples to load for train", true);
@@ -79,17 +85,25 @@ int main(int argc, char **argv)
   OneHotClassFormat class_format(&data);
 
   // Load the model
-  CommunicatingStackedAutoencoder *csae = LoadCSAE(allocator, flag_model_filename);
+  GradientMachine *model = NULL;
+  if (!strcmp(flag_model_type, "csae"))
+    model = LoadCSAE(allocator, flag_model_filename);
+  else if (!strcmp(flag_model_type, "linear"))
+    model = LoadCoder(allocator, flag_model_filename);
+  else
+    error("model type %s is not supported.", flag_model_type);
 
   // Criterion
-  ClassNLLCriterion criterion(&class_format);
-  
+  Criterion *criterion = NULL;
+  if (!strcmp(flag_criterion_type, "mse"))
+    criterion = new(allocator) MSECriterion(model->n_outputs);
+  else if (!strcmp(flag_criterion_type, "class-nll"))
+    criterion = new(allocator) ClassNLLCriterion(&class_format);
+  else
+    error("criterion type %s is not supported.", flag_criterion_type);
+
   // Get the number of parameters
-  int n_params = 0;
-  Parameters *der_params = csae->der_params;
-  for (int i=0; i<der_params->n_data; i++)  {
-    n_params += der_params->size[i];
-  }
+  int n_params = GetNParams(model);
   std::cout << n_params << " parameters." << std::endl;
 
   // Allocate the mat to save the gradients
@@ -97,26 +111,23 @@ int main(int argc, char **argv)
   Mat *covariance = new(allocator) Mat(n_params, n_params);
 
   // Set the dataset
-  csae->setDataSet(&data);
-  criterion.setDataSet(&data);
-
-  // Clear the derivatives
-  for(int i=0; i<der_params->n_data; i++)
-    memset(der_params->data[i], 0, sizeof(real)*der_params->size[i]);
+  model->setDataSet(&data);
+  criterion->setDataSet(&data);
+  ClearDerivatives(model);
 
   // Iterate over the data
   int tick = 1;
+  Parameters *der_params = model->der_params;
   for (int i=0; i<data.n_examples; i++)  {
     data.setExample(i);
 
     // fbprop
-    csae->forward(data.inputs);
-    criterion.forward(csae->outputs);
-
-    criterion.backward(csae->outputs, NULL);
-    csae->backward(data.inputs, criterion.beta);
+    model->forward(data.inputs);
+    criterion->forward(model->outputs);
+    criterion->backward(model->outputs, NULL);
+    model->backward(data.inputs, criterion->beta);
     
-    // save the gradients
+    // Copy and clear der_params.
     real *ptr = gradients->ptr[i];
     for(int j=0; j<der_params->n_data; j++) {
       memcpy(ptr, der_params->data[j], der_params->size[j] * sizeof(real));
@@ -158,10 +169,11 @@ int main(int argc, char **argv)
     gradient_mean->ptr[i] *= inv_n_examples;
 
   // Center the gradients
-  message("Centering the gradients.");
+  /*message("Centering the gradients.");
   for (int i=0; i<data.n_examples; i++)
     for (int j=0; j<n_params; j++)
       gradients->ptr[i][j] -= gradient_mean->ptr[j];
+  */
 
   // Compute the covariance
   message("Computing the covariance.");
@@ -176,30 +188,11 @@ int main(int argc, char **argv)
   Vec *d = new(allocator) Vec(n_params);
   Mat *V = new(allocator) Mat(n_params, n_params);
 
-  // The eigen values and vectors are *NOT SORTED*. Furthermore, the vectors
+  // The eigen values and vectors are SORTED. Furthermore, the vectors
   // are on the columns.
   mxSymEig(covariance, V, d);
 
-  // Sort the eigen values using Dumb Sort
-  message("Sorting the eigen values-vectors"); 
-  for (int i=0; i<n_params; i++) {
-    // Initialize the max search
-    int max_index = i;
-    real max_value = d->ptr[i];
-
-    // Compare with remaining possibilities
-    for (int j=i+1; j<n_params; j++) {
-      if (max_value < d->ptr[j])  {
-        max_value = d->ptr[j];
-        max_index = j;
-      }
-    }
-
-    // Swap!
-    d->ptr[max_index] = d->ptr[i];
-    d->ptr[i] = max_value;
-    mxSwapColsMat(V, i, max_index, -1, -1);
-  }
+  mxTrMat(V, V);
 
   // Save the eigenvals
   message("Saving the results");
@@ -217,16 +210,9 @@ int main(int argc, char **argv)
     error("Can't open file for eigenvals");
   for (int j=0; j<d->n; j++)
     fd_eigenvals << d->ptr[j] << std::endl;
-
-  // BINARY
-  //fd_eigenvals.open("hessian/eigenvals_full.bin", std::ios::binary);
-  //if (!fd_eigenvals.is_open())
-  //  error("Can't open 'hessian/eigenvals_full.bin'");
-  //fd_eigenvals.write((char*)d->ptr, n_params*sizeof(real));
-
   fd_eigenvals.close();
 
-  // Save the eigenvecs
+  // Save the eigenvecs - RIGHT NOW THEY'RE on the rows!
   std::ofstream fd_eigenvecs;
 
   // ASCII
@@ -241,14 +227,6 @@ int main(int argc, char **argv)
       fd_eigenvecs << V->ptr[j][k] << " ";
     fd_eigenvecs << std::endl;
   }
-
-  // BINARY
-  //fd_eigenvecs.open("hessian/eigenvecs_full.bin", std::ios::binary);
-  //if (!fd_eigenvecs.is_open())
-  //  error("Can't open 'hessian/eigenvecs_full.bin'");
-  //for (int i=0; i<n_params; i++)
-  //  fd_eigenvecs.write((char*)V->ptr[i], n_params*sizeof(real));
-
   fd_eigenvecs.close();
 
   delete allocator;
