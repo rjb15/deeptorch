@@ -351,6 +351,43 @@ void CommunicatingSaePairTrainer::FreeComDataSetsCriteriaMeasurers()
 }
 */
 
+void SaveCoder(std::string expdir, std::string filename, Coder *coder)
+{
+  warning("SaveCoder(...) - implements a partial save only.");
+
+  std::string model_filename = expdir + filename;
+  DiskXFile xfile_model(model_filename.c_str(), "w");
+
+  xfile_model.taggedWrite(&coder->n_inputs, sizeof(int), 1, "n_inputs");
+  xfile_model.taggedWrite(&coder->n_outputs, sizeof(int), 1, "n_outputs");
+  int nonlinearity_length = coder->nonlinearity.length()+1;
+  xfile_model.taggedWrite(&nonlinearity_length, sizeof(int), 1, "nonlinearity_length");
+  xfile_model.taggedWrite((char*)coder->nonlinearity.c_str(), sizeof(char), nonlinearity_length, "nonlinearity");
+
+  coder->saveXFile(&xfile_model);
+}
+
+Coder* LoadCoder(Allocator* allocator, std::string filename)
+{
+  warning("LoadCoder(...) - implements a partial load only.");
+  XFile *m = new(allocator) DiskXFile(filename.c_str(), "r");
+  
+  int n_inputs=0;
+  m->taggedRead(&n_inputs, sizeof(int), 1, "n_inputs");
+  int n_outputs=0;
+  m->taggedRead(&n_outputs, sizeof(int), 1, "n_outputs");
+  int nonlinearity_length=0;
+  m->taggedRead(&nonlinearity_length, sizeof(int), 1, "nonlinearity_length");
+  char *nonlinearity = new char[nonlinearity_length];
+  m->taggedRead(nonlinearity, sizeof(char), nonlinearity_length, "nonlinearity");
+
+  Coder *coder = new(allocator) Coder(n_inputs, n_outputs, false, NULL, false, false, nonlinearity);
+  coder->loadXFile(m);
+
+  delete nonlinearity;
+  return coder;
+}
+
 
 void SaveCSAE(std::string expdir, std::string type, int n_layers, int n_inputs, int *units_per_hidden_layer, int *units_per_speech_layer,
               int n_classes,
