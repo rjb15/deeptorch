@@ -169,6 +169,7 @@ int main(int argc, char **argv)
     gradient_mean->ptr[i] *= inv_n_examples;
 
   // Center the gradients
+  message("*NOT* Centering the gradients.");
   /*message("Centering the gradients.");
   for (int i=0; i<data.n_examples; i++)
     for (int j=0; j<n_params; j++)
