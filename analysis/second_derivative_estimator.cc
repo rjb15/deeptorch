@@ -55,6 +55,8 @@ int main(int argc, char **argv)
   char *flag_model_filename;
   char *flag_model_label;
   char *flag_directions_filename;
+  char *flag_model_type;
+  char *flag_criterion_type;
 
   int flag_n_directions;
   real flag_epsilon;
@@ -73,6 +75,8 @@ int main(int argc, char **argv)
   cmd.addSCmdArg("-model_filename", &flag_model_filename, "the model filename");
   cmd.addSCmdArg("-model_label", &flag_model_label, "Label for describing the model.");
   cmd.addSCmdArg("-directions_filename", &flag_directions_filename, "the name of the file containing the directions");
+  cmd.addSCmdArg("-model_type", &flag_model_type, "the type of the model: csae or linear.");
+  cmd.addSCmdArg("-criterion_type", &flag_criterion_type, "the type of the criterion: 'mse' or 'class-nll'.");
 
   cmd.addICmdOption("-n_directions", &flag_n_directions, 7, "number directions to load from the file", true);
   cmd.addRCmdOption("-epsilon", &flag_epsilon, 1e-6, "stepsize for finite difference", true);
@@ -92,16 +96,25 @@ int main(int argc, char **argv)
                                           // all classes are in the test set?
 
   // Load the model
-  CommunicatingStackedAutoencoder *csae = LoadCSAE(allocator, flag_model_filename);
+  GradientMachine *model = NULL;
+  if (!strcmp(flag_model_type, "csae"))
+    model = LoadCSAE(allocator, flag_model_filename);
+  else if (!strcmp(flag_model_type, "linear"))
+    model = LoadCoder(allocator, flag_model_filename);
+  else
+    error("model type %s is not supported.", flag_model_type);
 
   // Determine the number of parameters
-  int n_params = 0;
-  for (int i=0; i<csae->params->n_data; i++)  {
-    n_params += csae->params->size[i];
-  }
+  int n_params = GetNParams(model);
 
   // Criterion
-  ClassNLLCriterion *criterion = new(allocator) ClassNLLCriterion(&class_format);
+  Criterion *criterion = NULL;
+  if (!strcmp(flag_criterion_type, "mse"))
+    criterion = new(allocator) MSECriterion(model->n_outputs);
+  else if (!strcmp(flag_criterion_type, "class-nll"))
+    criterion = new(allocator) ClassNLLCriterion(&class_format);
+  else
+    error("criterion type %s is not supported.", flag_criterion_type);
 
   // Load the directions
   Mat *directions = new(allocator) Mat(flag_n_directions, n_params);
@@ -109,7 +122,7 @@ int main(int argc, char **argv)
 
   // Evaluate the gradient
   Vec *gradient = new(allocator) Vec(n_params);
-  EvaluateGradient(csae, criterion, data, gradient);
+  EvaluateGradient(model, criterion, data, gradient);
 
   // For each direction:
   //    - project the gradient in the direction.
@@ -118,24 +131,38 @@ int main(int argc, char **argv)
   //    - return to initial position
   //    - compute the second derivative
   Vec* direction = new(allocator) Vec(NULL, n_params);
-  Vec* gradient_after_step = new(allocator) Vec(n_params);
-  real gradient_in_direction, gradient_in_direction_after_step;
+  Vec* gradient_pos_step = new(allocator) Vec(n_params);
+  Vec* gradient_neg_step = new(allocator) Vec(n_params);
+  real gradient_in_direction, gradient_in_direction_pos_step, gradient_in_direction_neg_step;
   real second_derivative;
+  real variance;
 
   for (int i=0; i<flag_n_directions; i++) {
     direction->ptr = directions->ptr[i];
-    assert( (direction->norm2()-1.0) < 1e-6 );
+    assert( fabs(direction->norm2()-1.0) < 1e-6 );
 
     gradient_in_direction = direction->iP(gradient);
 
-    StepInParameterSpace(csae, direction, flag_epsilon);
-    EvaluateGradient(csae, criterion, data, gradient_after_step);
+    // Compute the variance in the direction
+    variance = EvaluateGradientVarianceInDirection(model, criterion, data, direction); 
 
-    gradient_in_direction_after_step = direction->iP(gradient_after_step);
+    // Positive step
+    StepInParameterSpace(model, direction, flag_epsilon);
+    EvaluateGradient(model, criterion, data, gradient_pos_step);
+    gradient_in_direction_pos_step = direction->iP(gradient_pos_step);
 
-    second_derivative = fabs(gradient_in_direction_after_step-gradient_in_direction) / flag_epsilon;
+    // Negative step
+    StepInParameterSpace(model, direction, -2 * flag_epsilon);
+    EvaluateGradient(model, criterion, data, gradient_neg_step);
+    gradient_in_direction_neg_step = direction->iP(gradient_neg_step);
 
-    std::cout << second_derivative << std::endl;
+    // Return to original position
+    StepInParameterSpace(model, direction, flag_epsilon);
+
+    // Compute second derivative
+    second_derivative = fabs(gradient_in_direction_pos_step-gradient_in_direction_neg_step) / (2*flag_epsilon);
+
+    std::cout << "variance: " << variance << " 2nd derivative: " << second_derivative << std::endl;
   } 
 
   delete allocator;

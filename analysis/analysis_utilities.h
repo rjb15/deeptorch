@@ -23,8 +23,11 @@
 
 namespace Torch {
 
+int GetNParams(GradientMachine *machine);
+void ClearDerivatives(GradientMachine *machine);
 void LoadDirections(char *directions_filename, int n_directions, Mat *directions);
 void EvaluateGradient(GradientMachine *machine, Criterion *criterion, DataSet *data, Vec *gradient);
+real EvaluateGradientVarianceInDirection(GradientMachine *machine, Criterion *criterion, DataSet *data, Vec *direction);
 void StepInParameterSpace(GradientMachine *machine, Vec *direction, real stepsize);
 
 }

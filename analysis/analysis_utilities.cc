@@ -8,6 +8,24 @@
 
 namespace Torch {
 
+int GetNParams(GradientMachine *machine)
+{
+  int n_params = 0;
+  for (int i=0; i<machine->params->n_data; i++)  {
+    n_params += machine->params->size[i];
+  }
+  return n_params;
+}
+
+void ClearDerivatives(GradientMachine *machine)
+{
+  Parameters *der_params = machine->der_params;
+  for(int i=0; i<der_params->n_data; i++) {
+    for (int j=0; j<der_params->size[i]; j++)
+      der_params->data[i][j] = 0.0;
+  }
+}
+
 // 
 void LoadDirections(char *directions_filename, int n_directions, Mat *directions)
 {
@@ -57,9 +75,7 @@ void EvaluateGradient(GradientMachine *machine, Criterion *criterion, DataSet *d
   for (int i=0; i<gradient->n; i++)
     gradient->ptr[i] = 0.0;
 
-  Parameters *der_params = machine->der_params;
-  for(int i=0; i<der_params->n_data; i++)
-    memset(der_params->data[i], 0, sizeof(real)*der_params->size[i]);
+  ClearDerivatives(machine);
 
   // Go over the dataset, accumulating the gradients in the der_params 
   for (int i=0; i<data->n_examples; i++)  {
@@ -73,15 +89,67 @@ void EvaluateGradient(GradientMachine *machine, Criterion *criterion, DataSet *d
 
   // Copy and normalize
   int offset = 0;
+  Parameters *der_params = machine->der_params;
   for (int pg=0; pg<der_params->n_data; pg++) {   // pg = parameter group
     for (int i=0; i<der_params->size[pg]; i++)
       gradient->ptr[offset+i] = der_params->data[pg][i] / data->n_examples;
     offset += der_params->size[pg];
   }
 
-  // Clear the derivatives.
-  for(int i=0; i<der_params->n_data; i++)
-    memset(der_params->data[i], 0, sizeof(real)*der_params->size[i]);
+  ClearDerivatives(machine);
+}
+
+real EvaluateGradientVarianceInDirection(GradientMachine *machine, Criterion *criterion, DataSet *data, Vec *direction)
+{
+  machine->setDataSet(data);
+  criterion->setDataSet(data);
+  ClearDerivatives(machine);
+
+  // Variables for holding the gradients
+  Vec example_gradient(GetNParams(machine));
+  Allocator allocator;
+  real *gradients_in_direction = (real*) allocator.alloc(sizeof(real)*data->n_examples);
+  real mean_gradient_in_direction = 0.0;
+
+  // Go over the dataset,  
+  for (int i=0; i<data->n_examples; i++)  {
+    data->setExample(i);
+    // fbprop
+    machine->forward(data->inputs);
+    criterion->forward(machine->outputs);
+    criterion->backward(machine->outputs, NULL);
+    machine->backward(data->inputs, criterion->beta);
+    // Copy gradient to a vector
+    int offset = 0;
+    Parameters *der_params = machine->der_params;
+    for (int pg=0; pg<der_params->n_data; pg++) {   // pg = parameter group
+      for (int p=0; p<der_params->size[pg]; p++)
+        example_gradient.ptr[offset+p] = der_params->data[pg][p];
+      offset += der_params->size[pg];
+      // Clear derivatives
+      memset(der_params->data[pg], 0, sizeof(real)*der_params->size[pg]);
+    }
+    // Get gradient in direction
+    gradients_in_direction[i] = direction->iP(&example_gradient);
+    mean_gradient_in_direction += gradients_in_direction[i];
+  }
+
+  // Compute the mean gradient in the direction
+  mean_gradient_in_direction /= data->n_examples;
+
+  // Compute the variance
+  real variance_in_direction = 0.0;
+  real centered_gradient_in_direction;
+  for (int i=0; i<data->n_examples; i++)  {
+    //centered_gradient_in_direction = gradients_in_direction[i] - mean_gradient_in_direction;
+    //variance_in_direction += centered_gradient_in_direction * centered_gradient_in_direction;
+    variance_in_direction += gradients_in_direction[i] * gradients_in_direction[i];
+  }
+
+  variance_in_direction /= (data->n_examples-1);
+
+  return variance_in_direction;
+
 }
 
 void StepInParameterSpace(GradientMachine *machine, Vec *direction, real stepsize)
