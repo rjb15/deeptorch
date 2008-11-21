@@ -295,7 +295,7 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsupLayerwise(int* pretrain_list)
   layerwise_training = false;
 }
 
-void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list)
+void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list, bool partial_backprop)
 {
   // Find the topmost trained layer
   int index_topmost_trained = -1;
@@ -328,10 +328,14 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list)
     if (pretrain_list[i]==1)  {
       // Just plug the decoder into its (non-noisy) encoder
       if(!sae->is_noisy)  {
+       // Do we want to backpropagate the gradient to the lower layers?
+       sae->encoders[i]->setPartialBackprop(partial_backprop);
        selective_machine->addMachine(sae->decoders[i]);
        selective_machine->connectOn(sae->encoders[i]);
       // Use the autoencoder (it's noisy)
       }     else    {
+        // Do we want to backpropagate the gradient to the lower layers?
+        sae->autoencoders[i]->setPartialBackprop(partial_backprop);
         // if not the first layer, connect (noisy) autoencoder to lower encoder
         if(i>0) {
           selective_machine->addMachine(sae->autoencoders[i]);
@@ -392,6 +396,15 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list)
 
   // Calling setExample on unsup_datasets[0] will call it for supervised_train_data also.
   train(unsup_datasets[0], &the_measurers);
+
+  // Assumes that we want them to be true at the end of this function
+  // TODO: revert them to their state before we called this function
+  for (int i=0; i<sae->n_hidden_layers; i++) {
+    if (!sae->is_noisy) 
+      sae->encoders[i]->setPartialBackprop(false);
+    else
+      sae->autoencoders[i]->setPartialBackprop(false);
+  }
 
   machine = sae;
   criterion = sup_criterion;

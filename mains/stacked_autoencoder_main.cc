@@ -108,6 +108,7 @@ int main(int argc, char **argv)
   bool flag_eval_criter_weights;
   bool flag_criter_avg_framesize;
   bool flag_profile_gradients;
+  bool flag_partial_backprop;
 
   // --- Stuff ---
   int flag_start_seed;
@@ -180,6 +181,7 @@ int main(int argc, char **argv)
   cmd.addBCmdOption("-eval_criter_weights", &flag_eval_criter_weights, false, "if true, weigh the criterions based on hessian-based magic.", true);
   cmd.addBCmdOption("-criter_avg_framesize", &flag_criter_avg_framesize, false, "if true, costs of unsup criterions are divided by number of inputs", true);
   cmd.addBCmdOption("-profile_gradients", &flag_profile_gradients, false, "if true, profile the gradients", true);
+  cmd.addBCmdOption("-partial_backprop", &flag_partial_backprop, false, "if true, will not backpropagate gradients to lower layers during unsupervised training", true);
 
   // Stuff
   cmd.addICmdOption("start_seed", &flag_start_seed, 1, "the random seed used in the beginning (-1 to for random seed)", true);
@@ -414,7 +416,7 @@ int main(int argc, char **argv)
     flags[3] = flag_pretrain_layer_4;
 
     //csae_trainer.TrainSelectiveUnsupLayerwise(flags);
-    csae_trainer.TrainSelectiveUnsup(flags);
+    csae_trainer.TrainSelectiveUnsup(flags, flag_partial_backprop);
 
   }
 
