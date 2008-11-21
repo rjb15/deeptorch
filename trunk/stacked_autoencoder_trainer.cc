@@ -397,7 +397,8 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list, bool par
   // Calling setExample on unsup_datasets[0] will call it for supervised_train_data also.
   train(unsup_datasets[0], &the_measurers);
 
-  // Assumes that we want them to be true at the end of this function
+  // Assumes that we want them to be false at the end of this function
+  // This is usually the case
   // TODO: revert them to their state before we called this function
   for (int i=0; i<sae->n_hidden_layers; i++) {
     if (!sae->is_noisy) 
