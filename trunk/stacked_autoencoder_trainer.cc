@@ -544,6 +544,11 @@ void StackedAutoencoderTrainer::TrainUnsup(DataSet *supervised_train_data,
   // Set the outputer to do partial backprop
   sae->outputer->setPartialBackprop(true);
 
+  // HACK
+  sae->outputer->beta->resize(1);
+
+  ClearSequence(sae->outputer->beta);
+
   // Train
   TrainSupUnsup(supervised_train_data, measurers, 1.0);
 
