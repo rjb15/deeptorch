@@ -177,6 +177,13 @@ real StackedAutoencoderTrainer::EvalHessian(GradientMachine *the_gm, Criterion* 
   return 1.0/max_variance;
 }
 
+void StackedAutoencoderTrainer::ClearSequence(Sequence *seq)
+{
+  for (int i = 0; i < seq->n_frames; i++)
+    for (int j=0; j< seq->frame_size; j++)
+      seq->frames[i][j] = 0.0;
+}
+
 void StackedAutoencoderTrainer::TrainInitialize()
 {
 
@@ -325,17 +332,26 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list, bool par
   }
   // now add the decoders
   for (int i=0; i<sae->n_hidden_layers; i++)  {
+
+    // In the partial_backprop case we want ALL encoders to do partial bprop
+    // and, if noisy, the selectively pretrained autoencoders as well.
+    // (this can save some computations).
+    sae->encoders[i]->setPartialBackprop(partial_backprop);
+    if (partial_backprop)
+      ClearSequence(sae->encoders[i]->beta);
+
     if (pretrain_list[i]==1)  {
       // Just plug the decoder into its (non-noisy) encoder
       if(!sae->is_noisy)  {
-       // Do we want to backpropagate the gradient to the lower layers?
-       sae->encoders[i]->setPartialBackprop(partial_backprop);
        selective_machine->addMachine(sae->decoders[i]);
        selective_machine->connectOn(sae->encoders[i]);
       // Use the autoencoder (it's noisy)
       }     else    {
         // Do we want to backpropagate the gradient to the lower layers?
         sae->autoencoders[i]->setPartialBackprop(partial_backprop);
+        if (partial_backprop)
+          ClearSequence(sae->autoencoders[i]->beta);
+
         // if not the first layer, connect (noisy) autoencoder to lower encoder
         if(i>0) {
           selective_machine->addMachine(sae->autoencoders[i]);
@@ -401,9 +417,8 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list, bool par
   // This is usually the case
   // TODO: revert them to their state before we called this function
   for (int i=0; i<sae->n_hidden_layers; i++) {
-    if (!sae->is_noisy) 
-      sae->encoders[i]->setPartialBackprop(false);
-    else
+    sae->encoders[i]->setPartialBackprop(false);
+    if (sae->is_noisy) 
       sae->autoencoders[i]->setPartialBackprop(false);
   }
 

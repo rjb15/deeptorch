@@ -100,6 +100,7 @@ class StackedAutoencoderTrainer : public StochasticGradientPlus
                                        XFile* resultsfile_=NULL);
 
     virtual real EvalHessian(GradientMachine *the_gm, Criterion* the_criterion, DataSet *the_data, int n_samples);
+    virtual void ClearSequence(Sequence *seq);
 
     virtual void TrainInitialize();
     virtual void TrainFinalize();
