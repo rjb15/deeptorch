@@ -399,7 +399,7 @@ int main(int argc, char **argv)
 
   }
 
-  if(flag_selective_layerwise_pretraining) {
+  if(flag_max_iter_lwu && flag_selective_layerwise_pretraining) {
     csae_trainer.setROption("learning rate", flag_lr_lwu);
     csae_trainer.setIOption("max iter", flag_max_iter_lwu);
  
