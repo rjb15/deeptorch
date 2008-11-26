@@ -27,7 +27,8 @@ class SmoothedLinear : public Linear
   public:
     int input_sub_unit_size;
     int input_n_sub_units;
-    real smoothing_weight_decay;
+    real l1_smoothing_weight_decay;
+    real l2_smoothing_weight_decay;
 
     ///
     SmoothedLinear(int n_inputs_, int n_outputs_);

@@ -329,11 +329,12 @@ void StackedAutoencoder::setDestructionOptions(real destruct_prob, real destruct
   }
 }
 
-void StackedAutoencoder::setSmoothingDecay(real smoothing_decay)
+void StackedAutoencoder::setSmoothingDecay(real l1_smoothing_decay, real l2_smoothing_decay)
 {
   if (first_layer_smoothed) {
     SmoothedLinear *sl = (SmoothedLinear*) encoders[0]->linear_layer;
-    sl->setROption("smoothing weight decay", smoothing_decay);
+    sl->setROption("l1 smoothing weight decay", l1_smoothing_decay);
+    sl->setROption("l2 smoothing weight decay", l2_smoothing_decay);
   }
 }
 

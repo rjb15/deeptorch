@@ -87,7 +87,8 @@ int main(int argc, char **argv)
   bool flag_init_from_binners;
   char *flag_binners_location;
   bool flag_first_layer_smoothed;
-  real flag_smoothing_decay;
+  real flag_l1_smoothing_decay;
+  real flag_l2_smoothing_decay;
 
   // --- Training ---
   int flag_max_iter_lwu;
@@ -159,7 +160,8 @@ int main(int argc, char **argv)
   cmd.addSCmdOption("-binners_location", &flag_binners_location, "", "directory where to find the binners");
   cmd.addBCmdOption("-reparametrize_tied", &flag_reparametrize_tied, false, "if you want to reparametrize the tied weights.");
   cmd.addBCmdOption("-first_layer_smoothed", &flag_first_layer_smoothed, false, "if you want to have a smoothing weight decay on the 1st layer.");
-  cmd.addRCmdOption("-smoothing_decay", &flag_smoothing_decay, 0.0, "Smoothing weight decay.");
+  cmd.addRCmdOption("-l1_smoothing_decay", &flag_l1_smoothing_decay, 0.0, "L1 Smoothing weight decay.");
+  cmd.addRCmdOption("-l2_smoothing_decay", &flag_l2_smoothing_decay, 0.0, "L2 Smoothing weight decay.");
 
   // Training
   cmd.addText("\nTraining options:");
@@ -239,7 +241,8 @@ int main(int argc, char **argv)
      << "-ifb=" << flag_init_from_binners
      << "-rpmt=" << flag_reparametrize_tied
      << "-fls=" << flag_first_layer_smoothed
-     << "-sdk=" << flag_smoothing_decay
+     << "-l1sdk=" << flag_l1_smoothing_decay
+     << "-l2sdk=" << flag_l2_smoothing_decay
      << "-lwe=" << flag_max_iter_lwu 
      << "-ace=" << flag_max_iter_ac << "-sce=" << flag_max_iter_sc
      << "-lwu=" << flag_lr_lwu 
@@ -320,7 +323,7 @@ int main(int argc, char **argv)
   csae.setL2WeightDecay(flag_l2_decay);
   csae.setBiasDecay(flag_bias_decay);
   csae.setDestructionOptions(flag_corrupt_prob, flag_corrupt_value);
-  csae.setSmoothingDecay(flag_smoothing_decay);
+  csae.setSmoothingDecay(flag_l1_smoothing_decay, flag_l2_smoothing_decay);
 
   message("Models instanciated.\n");
 
