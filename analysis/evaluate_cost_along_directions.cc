@@ -65,6 +65,7 @@ int main(int argc, char **argv)
   char *flag_model_filename;
   char *flag_directions_filename;
 
+  int flag_directions_offset;
   int flag_n_directions;
   int flag_n_steps_oneside;
   real flag_stepsize;
@@ -82,6 +83,7 @@ int main(int argc, char **argv)
   cmd.addSCmdArg("-model_filename", &flag_model_filename, "the model filename");
   cmd.addSCmdArg("-directions_filename", &flag_directions_filename, "Name of the file containing the directions.");
 
+  cmd.addICmdOption("-directions_offset", &flag_directions_offset, 0, "offset in the directions file");
   cmd.addICmdOption("-n_directions", &flag_n_directions, 6, "number of directions to explore (first from the file)", true);
   cmd.addICmdOption("-n_steps_oneside", &flag_n_steps_oneside, 10, "How many evaluations to perform on each side of a direction.", true);
   cmd.addRCmdOption("-stepsize", &flag_stepsize, 1e-4, "Stepsize in parameter space.", true);
@@ -108,12 +110,12 @@ int main(int argc, char **argv)
   for (int i=0; i<csae->params->n_data; i++)  {
     n_params += csae->params->size[i];
   }
-  Mat *directions = new(allocator) Mat(flag_n_directions, n_params);
-  LoadDirections(flag_directions_filename, flag_n_directions, directions);
+  Mat *directions = new(allocator) Mat(flag_directions_offset + flag_n_directions, n_params);
+  LoadDirections(flag_directions_filename, flag_directions_offset + flag_n_directions, directions);
 
   // Evaluate cost along the directions
   for (int i=0; i<flag_n_directions; i++) 
-    EvaluateCostAlongDirection(csae, flag_data_label, &data, &class_format, i, directions,
+    EvaluateCostAlongDirection(csae, flag_data_label, &data, &class_format, flag_directions_offset + i, directions,
                                      flag_n_steps_oneside, flag_stepsize);
 
   delete allocator;
