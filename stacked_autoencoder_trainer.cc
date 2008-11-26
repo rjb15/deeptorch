@@ -337,8 +337,13 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list, bool par
     // and, if noisy, the selectively pretrained autoencoders as well.
     // (this can save some computations).
     sae->encoders[i]->setPartialBackprop(partial_backprop);
-    if (partial_backprop)
+    // This means it will not update its beta. However, a ConnectedMachine
+    // that it is part of will use the beta. Hence, we must resize it
+    // and clear it. The HACK is that we assume sequences of 1 frame.
+    if (partial_backprop) {
+      //sae->encoders[i]->beta->resize(1); 
       ClearSequence(sae->encoders[i]->beta);
+    }
 
     if (pretrain_list[i]==1)  {
       // Just plug the decoder into its (non-noisy) encoder
@@ -349,8 +354,10 @@ void StackedAutoencoderTrainer::TrainSelectiveUnsup(int* pretrain_list, bool par
       }     else    {
         // Do we want to backpropagate the gradient to the lower layers?
         sae->autoencoders[i]->setPartialBackprop(partial_backprop);
-        if (partial_backprop)
+        if (partial_backprop) {
+          //sae->autoencoders[i]->beta->resize(1);
           ClearSequence(sae->autoencoders[i]->beta);
+        }
 
         // if not the first layer, connect (noisy) autoencoder to lower encoder
         if(i>0) {
@@ -542,11 +549,11 @@ void StackedAutoencoderTrainer::TrainUnsup(DataSet *supervised_train_data,
   message(ss.str().c_str());
 
   // Set the outputer to do partial backprop
+  // This means it will not update its beta. However, a ConnectedMachine
+  // that it is part of will use the beta. Hence, we must resize it
+  // and clear it. The HACK is that we assume sequences of 1 frame.
   sae->outputer->setPartialBackprop(true);
-
-  // HACK
   sae->outputer->beta->resize(1);
-
   ClearSequence(sae->outputer->beta);
 
   // Train
