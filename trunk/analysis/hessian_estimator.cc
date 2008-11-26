@@ -13,11 +13,10 @@
 // limitations under the License.
 //
 const char *help = "\
-hessian_estimator\n\
+gradient_covariance_estimator\n\
 \n\
-This program estimates the hessian's leading (largest) eigen values-vectors\n\
-using the covariance approximation. To do so, we use the pca_estimator on the\n\
-gradients.\n";
+This program estimates the leading (largest) eigen values-vectors of the covariance\n\
+of the gradients. To do so, we use the pca_estimator on the gradients.\n";
 
 #include <string>
 #include <sstream>
@@ -37,6 +36,7 @@ gradients.\n";
 #include  "communicating_stacked_autoencoder.h"
 #include "pca_estimator.h"
 #include "helpers.h"
+#include "analysis_utilities.h"
 
 using namespace Torch;
 
@@ -85,8 +85,7 @@ int main(int argc, char **argv)
   MatDataSet matdata(flag_data_filename, flag_n_inputs, 1, false,
                                 flag_max_load, flag_binary_mode);
   ClassFormatDataSet data(&matdata,flag_n_classes);
-  OneHotClassFormat class_format(&data);  // Not sure about this... what if not
-                                          // all classes are in the test set?
+  OneHotClassFormat class_format(&data);
 
   // Load the model
   CommunicatingStackedAutoencoder *csae = LoadCSAE(allocator, flag_model_filename);
@@ -101,10 +100,7 @@ int main(int argc, char **argv)
   std::cout << n_param_groups << " groups of parameters." << std::endl;
   assert(n_param_groups == csae->n_hidden_layers+1);
 
-  int n_params = 0;
-  for (int i=0; i<n_param_groups; i++)  {
-    n_params += der_params->size[i];
-  }
+  int n_params = GetNParams(csae);
   std::cout << n_params << " parameters!" << std::endl;
 
   // Estimator - Just one 
@@ -137,7 +133,7 @@ int main(int argc, char **argv)
       }
       estimator->Observe(&sample);
 
-      error("must clear gradient!");
+      ClearDerivatives(csae);
  
       // Progress
       if ( (real)i/data.n_examples > tick/100.0)  {
