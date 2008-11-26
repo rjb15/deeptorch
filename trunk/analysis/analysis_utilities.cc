@@ -99,7 +99,7 @@ void EvaluateGradient(GradientMachine *machine, Criterion *criterion, DataSet *d
   ClearDerivatives(machine);
 }
 
-real EvaluateGradientVarianceInDirection(GradientMachine *machine, Criterion *criterion, DataSet *data, Vec *direction)
+real EvaluateGradientVarianceInDirection(GradientMachine *machine, Criterion *criterion, DataSet *data, Vec *direction, bool is_centered)
 {
   machine->setDataSet(data);
   criterion->setDataSet(data);
@@ -139,11 +139,14 @@ real EvaluateGradientVarianceInDirection(GradientMachine *machine, Criterion *cr
 
   // Compute the variance
   real variance_in_direction = 0.0;
-  real centered_gradient_in_direction;
+  real centered_gradient_in_direction = 0.0;
   for (int i=0; i<data->n_examples; i++)  {
-    //centered_gradient_in_direction = gradients_in_direction[i] - mean_gradient_in_direction;
-    //variance_in_direction += centered_gradient_in_direction * centered_gradient_in_direction;
-    variance_in_direction += gradients_in_direction[i] * gradients_in_direction[i];
+    if (is_centered)  {
+      centered_gradient_in_direction = gradients_in_direction[i] - mean_gradient_in_direction;
+      variance_in_direction += centered_gradient_in_direction * centered_gradient_in_direction;
+    } else  {
+      variance_in_direction += gradients_in_direction[i] * gradients_in_direction[i];
+    }
   }
 
   variance_in_direction /= (data->n_examples-1);
