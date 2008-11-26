@@ -142,8 +142,12 @@ void PcaEstimator::Reevaluate()
     // Swap!
     d->ptr[max_index] = d->ptr[i];
     d->ptr[i] = max_value;
-    mxSwapColsMat(V, i, max_index, -1, -1);
+    // WARNING! We want to swap columns but the method to do this is called 
+    // SWAP *ROWS*
+    //mxSwapColsMat(V, i, max_index, -1, -1);
+    mxSwapRowsMat(V, i, max_index, -1, -1);
   }
+
 
   // Convert the n_eigen first eigenvectors of the Gram matrix contained in V 
   // into *unnormalized* eigenvectors U of the covariance.
@@ -164,14 +168,14 @@ void PcaEstimator::Reevaluate()
     d->ptr[i] *= inv_rn2;
 
   //---------------------
-  /*
+/* 
   std::cout << "*** Reevaluate! ***" << std::endl;
   real normalizer = (1.0 - pow(gamma, (real)n_observations)) /(1.0 - gamma);
   real inv_normalizer = 1.0 / normalizer;
   std::cout << "inv_normalizer: " << inv_normalizer << std::endl;
-  for (int i=0; i<n_eigen; i++)
+  for (int i=0; i<n_eigen+minibatch_size; i++)
     std::cout << d->ptr[i] * inv_normalizer << std::endl;
-  */
+*/
   //---------------------
 
   // Update Xt, G and minibatch_index
