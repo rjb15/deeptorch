@@ -57,12 +57,14 @@ int main(int argc, char **argv)
   char *flag_directions_filename;
   char *flag_model_type;
   char *flag_criterion_type;
+  int flag_is_centered;
 
   int flag_n_directions;
   real flag_epsilon;
 
   int flag_max_load;
   bool flag_binary_mode;
+  char *flag_out_filename;
 
   // The actual command line
   CmdLine cmd;
@@ -77,13 +79,16 @@ int main(int argc, char **argv)
   cmd.addSCmdArg("-directions_filename", &flag_directions_filename, "the name of the file containing the directions");
   cmd.addSCmdArg("-model_type", &flag_model_type, "the type of the model: csae or linear.");
   cmd.addSCmdArg("-criterion_type", &flag_criterion_type, "the type of the criterion: 'mse' or 'class-nll'.");
+  cmd.addICmdArg("-is_centered", &flag_is_centered, "second moment (0) or variance (1).");
 
   cmd.addICmdOption("-n_directions", &flag_n_directions, 7, "number directions to load from the file", true);
   cmd.addRCmdOption("-epsilon", &flag_epsilon, 1e-6, "stepsize for finite difference", true);
   cmd.addICmdOption("-max_load", &flag_max_load, -1, "max number of examples to load for train", true);
   cmd.addBCmdOption("-binary_mode", &flag_binary_mode, false, "binary mode for files", true);
+  cmd.addSCmdOption("-out_filename", &flag_out_filename, "second_derivatives.txt", "Name of the file to output to.", true);
 
   cmd.read(argc, argv);
+  assert ( flag_is_centered == 0 || flag_is_centered == 1 );
 
   // Allocator
   Allocator *allocator = new Allocator;
@@ -106,6 +111,7 @@ int main(int argc, char **argv)
 
   // Determine the number of parameters
   int n_params = GetNParams(model);
+  std::cout << n_params << " parameters." << std::endl;
 
   // Criterion
   Criterion *criterion = NULL;
@@ -132,38 +138,54 @@ int main(int argc, char **argv)
   //    - compute the second derivative
   Vec* direction = new(allocator) Vec(NULL, n_params);
   Vec* gradient_pos_step = new(allocator) Vec(n_params);
-  Vec* gradient_neg_step = new(allocator) Vec(n_params);
-  real gradient_in_direction, gradient_in_direction_pos_step, gradient_in_direction_neg_step;
+  //Vec* gradient_neg_step = new(allocator) Vec(n_params);
+  real gradient_in_direction, gradient_in_direction_pos_step;
+  //real gradient_in_direction_neg_step;
   real second_derivative;
-  real variance;
+  //real variance;
+
+  std::ofstream fd_second_der;
+  fd_second_der.open(flag_out_filename);
+  if (!fd_second_der.is_open())
+    error("Could not open %s", flag_out_filename);
 
   for (int i=0; i<flag_n_directions; i++) {
     direction->ptr = directions->ptr[i];
-    assert( fabs(direction->norm2()-1.0) < 1e-6 );
+    if( !(fabs(direction->norm2()-1.0) < 1e-6) )  {
+      error("direction norm is not 1, but %d", direction->norm2());      
+    }
 
     gradient_in_direction = direction->iP(gradient);
 
     // Compute the variance in the direction
-    variance = EvaluateGradientVarianceInDirection(model, criterion, data, direction); 
+    //variance = EvaluateGradientVarianceInDirection(model, criterion, data, direction, flag_is_centered); 
 
     // Positive step
     StepInParameterSpace(model, direction, flag_epsilon);
     EvaluateGradient(model, criterion, data, gradient_pos_step);
     gradient_in_direction_pos_step = direction->iP(gradient_pos_step);
 
-    // Negative step
-    StepInParameterSpace(model, direction, -2 * flag_epsilon);
-    EvaluateGradient(model, criterion, data, gradient_neg_step);
-    gradient_in_direction_neg_step = direction->iP(gradient_neg_step);
-
     // Return to original position
-    StepInParameterSpace(model, direction, flag_epsilon);
+    StepInParameterSpace(model, direction, -flag_epsilon);
 
     // Compute second derivative
-    second_derivative = fabs(gradient_in_direction_pos_step-gradient_in_direction_neg_step) / (2*flag_epsilon);
+    second_derivative = fabs(gradient_in_direction_pos_step-gradient_in_direction) / flag_epsilon;
 
-    std::cout << "variance: " << variance << " 2nd derivative: " << second_derivative << std::endl;
+    // Negative step
+    //StepInParameterSpace(model, direction, -2 * flag_epsilon);
+    //EvaluateGradient(model, criterion, data, gradient_neg_step);
+    //gradient_in_direction_neg_step = direction->iP(gradient_neg_step);
+    // Return to original position
+    //StepInParameterSpace(model, direction, flag_epsilon);
+    // Compute second derivative
+    //second_derivative = fabs(gradient_in_direction_pos_step-gradient_in_direction_neg_step) / (2*flag_epsilon);
+
+    //std::cout << "variance (or 2nd moment): " << variance << " 2nd derivative: " << second_derivative << std::endl;
+    std::cout << second_derivative << std::endl;
+    fd_second_der << second_derivative << std::endl;
   } 
+
+  fd_second_der.close();
 
   delete allocator;
   return(0);
