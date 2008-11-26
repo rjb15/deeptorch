@@ -37,6 +37,7 @@ gradients.\n";
 #include  "communicating_stacked_autoencoder.h"
 #include "pca_estimator.h"
 #include "helpers.h"
+#include "analysis_utilities.h"
 
 using namespace Torch;
 
@@ -132,7 +133,7 @@ int main(int argc, char **argv)
         estimators[j]->Observe(&sample);
       }
 
-      error("must clear gradient!");
+      ClearDerivatives(csae);
  
       // Progress
       if ( (real)i/data.n_examples > tick/100.0)  {
