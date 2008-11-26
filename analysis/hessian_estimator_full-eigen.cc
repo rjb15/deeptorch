@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 const char *help = "\
-hessian_estimator_full-eigen\n\
+gradient_covariance_full-eigen\n\
 \n\
 This program computes the full eigendecomposition of the covariance\n\
 of the gradients on a model's parameters.\n";
@@ -38,6 +38,10 @@ of the gradients on a model's parameters.\n";
 #include "pca_estimator.h"
 #include "helpers.h"
 #include "analysis_utilities.h"
+#include "input_as_target_data_set.h"
+#include "dynamic_data_set.h"
+#include "concat_criterion.h"
+
 
 using namespace Torch;
 
@@ -54,6 +58,7 @@ int main(int argc, char **argv)
   char *flag_model_filename;
   char *flag_model_type;
   char *flag_criterion_type;
+  int flag_is_centered;
 
   char *flag_model_label;
   int flag_max_load;
@@ -68,12 +73,14 @@ int main(int argc, char **argv)
   cmd.addSCmdArg("-model_filename", &flag_model_filename, "the model filename");
   cmd.addSCmdArg("-model_type", &flag_model_type, "the type of the model: csae or linear.");
   cmd.addSCmdArg("-criterion_type", &flag_criterion_type, "the type of the criterion: 'mse' or 'class-nll'.");
+  cmd.addICmdArg("-is_centered", &flag_is_centered, "second moment (0) or covariance (1).");
 
   cmd.addSCmdOption("-model_label", &flag_model_label, "", "label used to describe the model", true);
   cmd.addICmdOption("-max_load", &flag_max_load, -1, "max number of examples to load for train", true);
   cmd.addBCmdOption("-binary_mode", &flag_binary_mode, false, "binary mode for files", true);
 
   cmd.read(argc, argv);
+  assert ( flag_is_centered == 0 || flag_is_centered == 1 );
 
   // Allocator
   Allocator *allocator = new Allocator;
@@ -84,10 +91,16 @@ int main(int argc, char **argv)
   ClassFormatDataSet data(&matdata,flag_n_classes);
   OneHotClassFormat class_format(&data);
 
+  DataSet *the_data = &data;
+
   // Load the model
+  CommunicatingStackedAutoencoder *csae = NULL;
   GradientMachine *model = NULL;
-  if (!strcmp(flag_model_type, "csae"))
-    model = LoadCSAE(allocator, flag_model_filename);
+
+  if (!strcmp(flag_model_type, "csae")) {
+    csae = LoadCSAE(allocator, flag_model_filename);
+    model = csae;
+  }
   else if (!strcmp(flag_model_type, "linear"))
     model = LoadCoder(allocator, flag_model_filename);
   else
@@ -99,6 +112,40 @@ int main(int argc, char **argv)
     criterion = new(allocator) MSECriterion(model->n_outputs);
   else if (!strcmp(flag_criterion_type, "class-nll"))
     criterion = new(allocator) ClassNLLCriterion(&class_format);
+  else if (!strcmp(flag_criterion_type, "unsup-xentropy")) {
+    // Must have a csae
+    assert(csae);
+
+    // The model!
+    model = csae->unsup_machine;
+
+    // Set up a ConcatCriterion
+    DataSet **unsup_datasets = (DataSet**) allocator->alloc(sizeof(DataSet*)*(csae->n_hidden_layers));
+    Criterion **the_criterions = (Criterion**) allocator->alloc(sizeof(Criterion *)*(csae->n_hidden_layers));
+
+    for(int i=0; i<csae->n_hidden_layers; i++)     {
+      // Dataset
+      if (i == 0)
+        unsup_datasets[0] = new(allocator) InputAsTargetDataSet(&data);
+      else
+        unsup_datasets[i] = new(allocator) DynamicDataSet(&data, (Sequence*)NULL, csae->encoders[i-1]->outputs);
+  
+      // Criterion
+      the_criterions[i] = NewUnsupCriterion(allocator, "xentropy", csae->decoders[i]->n_outputs);
+      the_criterions[i]->setBOption("average frame size", true);  // averaging frame size!
+      the_criterions[i]->setDataSet(unsup_datasets[i]);
+    }
+
+    //
+    Criterion *concat_criterion;
+    concat_criterion = new(allocator) ConcatCriterion(csae->unsup_machine->n_outputs,
+                                                 csae->n_hidden_layers,
+                                                 the_criterions,
+                                                 NULL);
+
+    criterion = concat_criterion;
+    the_data = unsup_datasets[0];
+  }
   else
     error("criterion type %s is not supported.", flag_criterion_type);
 
@@ -107,25 +154,25 @@ int main(int argc, char **argv)
   std::cout << n_params << " parameters." << std::endl;
 
   // Allocate the mat to save the gradients
-  Mat *gradients = new(allocator) Mat(data.n_examples, n_params);
+  Mat *gradients = new(allocator) Mat(the_data->n_examples, n_params);
   Mat *covariance = new(allocator) Mat(n_params, n_params);
 
   // Set the dataset
-  model->setDataSet(&data);
-  criterion->setDataSet(&data);
+  model->setDataSet(the_data);
+  criterion->setDataSet(the_data);
   ClearDerivatives(model);
 
   // Iterate over the data
   int tick = 1;
   Parameters *der_params = model->der_params;
-  for (int i=0; i<data.n_examples; i++)  {
-    data.setExample(i);
+  for (int i=0; i<the_data->n_examples; i++)  {
+    the_data->setExample(i);
 
     // fbprop
-    model->forward(data.inputs);
+    model->forward(the_data->inputs);
     criterion->forward(model->outputs);
     criterion->backward(model->outputs, NULL);
-    model->backward(data.inputs, criterion->beta);
+    model->backward(the_data->inputs, criterion->beta);
     
     // Copy and clear der_params.
     real *ptr = gradients->ptr[i];
@@ -136,7 +183,7 @@ int main(int argc, char **argv)
     }
 
     // Progress
-    if ( (real)i/data.n_examples > tick/10.0)  {
+    if ( (real)i/the_data->n_examples > tick/10.0)  {
       std::cout << ".";
       flush(std::cout);
       tick++;
@@ -146,11 +193,11 @@ int main(int argc, char **argv)
   // Compute the mean gradient norm
   real mean_norm2 = 0.0;
   Vec gradient(NULL, n_params);
-  for (int i=0; i<data.n_examples; i++)  {
+  for (int i=0; i<the_data->n_examples; i++)  {
     gradient.ptr = gradients->ptr[i];
     mean_norm2 += gradient.norm2();
   }
-  mean_norm2 /= data.n_examples;
+  mean_norm2 /= the_data->n_examples;
   std::cout << "mean_norm2 = " << mean_norm2 << std::endl;
 
   // Compute the mean gradient
@@ -159,27 +206,29 @@ int main(int argc, char **argv)
   for (int i=0; i<n_params; i++)
     gradient_mean->ptr[i] = 0.0;
 
-  for (int i=0; i<data.n_examples; i++)  {
+  for (int i=0; i<the_data->n_examples; i++)  {
     for (int j=0; j<n_params; j++)
       gradient_mean->ptr[j] += gradients->ptr[i][j];
   }
 
-  real inv_n_examples = 1.0 / data.n_examples;
+  real inv_n_examples = 1.0 / the_data->n_examples;
   for (int i=0; i<n_params; i++)
     gradient_mean->ptr[i] *= inv_n_examples;
 
   // Center the gradients
-  message("*NOT* Centering the gradients.");
-  /*message("Centering the gradients.");
-  for (int i=0; i<data.n_examples; i++)
-    for (int j=0; j<n_params; j++)
-      gradients->ptr[i][j] -= gradient_mean->ptr[j];
-  */
+  if (flag_is_centered) {
+    message("Centering the gradients.");
+    for (int i=0; i<the_data->n_examples; i++)
+      for (int j=0; j<n_params; j++)
+        gradients->ptr[i][j] -= gradient_mean->ptr[j];
+  } else  {
+    message("*NOT* Centering the gradients.");
+  }
 
   // Compute the covariance
   message("Computing the covariance.");
   mxTrMatMulMat(gradients, gradients, covariance);
-  mxRealMulMat(1.0/(data.n_examples-1.0), covariance, covariance);
+  mxRealMulMat(1.0/(the_data->n_examples-1.0), covariance, covariance);
 
   // Free up some memory!
   allocator->free(gradients);
@@ -197,15 +246,21 @@ int main(int argc, char **argv)
 
   // Save the eigenvals
   message("Saving the results");
-  std::ofstream fd_eigenvals;
+  std::string savedir;
+  if (flag_is_centered)
+    savedir = "covariance";
+  else
+    savedir = "second-moment";
+  savedir += flag_model_label;
 
   std::stringstream command;
-  command << "mkdir hessian" << flag_model_label;
+  command << "mkdir " << savedir;
   system(command.str().c_str());
 
   // ASCII
+  std::ofstream fd_eigenvals;
   std::stringstream ss_filename;
-  ss_filename << "hessian" << flag_model_label << "/eigenvals_full.txt";
+  ss_filename << savedir << "/eigenvals_full.txt";
   fd_eigenvals.open(ss_filename.str().c_str());
   if (!fd_eigenvals.is_open())
     error("Can't open file for eigenvals");
@@ -219,7 +274,7 @@ int main(int argc, char **argv)
   // ASCII
   ss_filename.str("");
   ss_filename.clear();
-  ss_filename << "hessian" << flag_model_label << "/eigenvecs_full.txt";
+  ss_filename << savedir << "/eigenvecs_full.txt";
   fd_eigenvecs.open(ss_filename.str().c_str());
   if (!fd_eigenvecs.is_open())
     error("Can't open eigenvecs file");
