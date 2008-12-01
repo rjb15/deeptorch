@@ -95,6 +95,8 @@ int main(int argc, char **argv)
   int flag_max_iter_uc;
   int flag_max_iter_ac;
   int flag_max_iter_sc;
+  int flag_max_iter_sc_topk;
+  int flag_top_k_layers;
   real flag_accuracy;
   real flag_lr_lwu;
   real flag_lr_unsup;
@@ -169,6 +171,8 @@ int main(int argc, char **argv)
   cmd.addICmdOption("-max_iter_uc", &flag_max_iter_uc, 2, "max number of iterations with the unsupervised costs (2nd phase)", true);
   cmd.addICmdOption("-max_iter_ac", &flag_max_iter_ac, 2, "max number of iterations with all the costs (3rd phase)", true);
   cmd.addICmdOption("-max_iter_sc", &flag_max_iter_sc, 2, "max number of iterations with only supervised cost (4th phase)", true);
+  cmd.addICmdOption("-max_iter_sc_topk", &flag_max_iter_sc_topk,0, "max number of iterations with only supervised cost on top k layers (5th phase)", true);
+  cmd.addICmdOption("-top_k_layers", &flag_top_k_layers, 1, "Number of layers to fine-tune starting from top (during 5th phase)", true);
   cmd.addRCmdOption("-accuracy", &flag_accuracy, 1e-5, "end accuracy", true);
   cmd.addRCmdOption("-lr_lwu", &flag_lr_lwu, 1e-3, "learning rate layerwise unsup phase", true);
   cmd.addRCmdOption("-lr_unsup", &flag_lr_unsup, 1e-3, "learning rate unsup phase", true);
@@ -241,10 +245,11 @@ int main(int argc, char **argv)
      << "-ifb=" << flag_init_from_binners
      << "-rpmt=" << flag_reparametrize_tied
      << "-fls=" << flag_first_layer_smoothed
-     << "-l1sdk=" << flag_l1_smoothing_decay
-     << "-l2sdk=" << flag_l2_smoothing_decay
+     << "-l1s=" << flag_l1_smoothing_decay
+     << "-l2s=" << flag_l2_smoothing_decay
      << "-lwe=" << flag_max_iter_lwu 
      << "-ace=" << flag_max_iter_ac << "-sce=" << flag_max_iter_sc
+     << "-scetk" << flag_max_iter_sc_topk << "-tk" << flag_top_k_layers
      << "-lwu=" << flag_lr_lwu 
      << "-pre=" << flag_pretrain_layer_1  << flag_pretrain_layer_2 << flag_pretrain_layer_3 << flag_pretrain_layer_4 
      << "-lru=" << flag_lr_unsup << "-lrsu=" << flag_lr_supunsup << "-lrs=" << flag_lr_sup
@@ -489,6 +494,20 @@ int main(int argc, char **argv)
 
     csae_trainer.train(&train_data, &csae_measurers);
   }
+
+   if (flag_max_iter_sc_topk) {
+    csae_trainer.setROption("learning rate", flag_lr_sup);
+    csae_trainer.setIOption("max iter", flag_max_iter_sc_topk);
+ 
+    if (flag_single_results_file) {
+      resultsfile = InitResultsFile(allocator,expdir,"sup");
+      csae_trainer.resultsfile = resultsfile;
+    }
+
+    csae_trainer.TrainSupervisedTopKLayers(&train_data, &csae_measurers, flag_top_k_layers);
+  }
+
+ 
 
   // === Save model ===
   if(flag_save_model) {

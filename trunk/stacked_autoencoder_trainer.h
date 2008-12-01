@@ -75,8 +75,9 @@ class StackedAutoencoderTrainer : public StochasticGradientPlus
 
     bool layerwise_training;
     int layerwise_layer;
-    bool outputer_training
-        ;
+    bool topK_training;
+    int topKlayers;
+
     // Gradient profiling
     bool profile_gradients;
     MeasurerList *upper_gradient_measurers;     // gradient from upper encoder
@@ -112,8 +113,8 @@ class StackedAutoencoderTrainer : public StochasticGradientPlus
     virtual void TrainSelectiveUnsup(int* pretrain_list, bool partial_backprop);
     virtual void TrainUnsupLayerwise();
     virtual void TrainUnsupLayer();
-    virtual void TrainOutputLayer(DataSet *supervised_train_data,
-                                  MeasurerList *measurers);
+    virtual void TrainSupervisedTopKLayers(DataSet *supervised_train_data,
+                                  MeasurerList *measurers, int top_k_layers);
 
     virtual void TrainUnsupNotOutput();
     virtual void TrainUnsup(DataSet *data, MeasurerList *measurers);
