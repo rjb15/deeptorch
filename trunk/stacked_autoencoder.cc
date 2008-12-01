@@ -245,10 +245,17 @@ void StackedAutoencoder::BuildUnsupMachine()
       if(i>0)     {
         unsup_machine->connectOn(encoders[i-1]);
       }
-      // See motivation for input_handle_machine in the header...
-      if(i==0 && is_noisy)  {
-        unsup_machine->addMachine(input_handle_machine);
-      }
+    }
+
+    // See motivation for input_handle_machine in the header...
+    if(i==0 && is_noisy)  {
+      unsup_machine->addMachine(input_handle_machine);
+    }
+
+    if ( (i<n_hidden_layers-1) || !is_noisy ) {
+      unsup_machine->addLayer();
+    }
+    else if (i==0 && is_noisy)  {
       unsup_machine->addLayer();
     }
   }
