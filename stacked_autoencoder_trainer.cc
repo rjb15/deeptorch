@@ -61,8 +61,9 @@ StackedAutoencoderTrainer::StackedAutoencoderTrainer(StackedAutoencoder *machine
 
   layerwise_training = false;
   layerwise_layer = 0;
-  outputer_training = false;
-
+  topK_training = false;
+  topKlayers = 0;
+  
   // Gradient profiling
   profile_gradients = false;
 
@@ -235,7 +236,7 @@ void StackedAutoencoderTrainer::IterFinalize()
 
 void StackedAutoencoderTrainer::fpropbprop(DataSet *data)
 {
-  if(!profile_gradients && !layerwise_training && !outputer_training) {
+  if(!profile_gradients && !layerwise_training && !topK_training) {
     StochasticGradientPlus::fpropbprop(data);
   }
   else if(layerwise_training)   {
@@ -247,13 +248,26 @@ void StackedAutoencoderTrainer::fpropbprop(DataSet *data)
     criterion->backward(machine->outputs, NULL);
     sae->autoencoders[layerwise_layer]->backward(data->inputs, criterion->beta);
   }
-  else if(outputer_training)    {
+  else if(topK_training)    {
+    // Full forward
     machine->forward(data->inputs);
     criterion->forward(machine->outputs);
 
-    // backward only the outputer
+    // backward the criterion
     criterion->backward(machine->outputs, NULL);
-    sae->outputer->backward(data->inputs, criterion->beta);
+
+    // backward the outputer (k must be at least 1)
+    sae->outputer->backward(sae->encoders[sae->n_hidden_layers-1]->outputs, criterion->beta);
+
+    // Then backward the k-1 remaining layers
+    for (int i=sae->n_hidden_layers-1; i>sae->n_hidden_layers-topKlayers; i--)  {
+      if (i == sae->n_hidden_layers-1)
+        sae->encoders[i]->backward(sae->encoders[i-1]->outputs, sae->outputer->beta);
+      else if ( i == 0)
+        sae->encoders[i]->backward(data->inputs, sae->encoders[i+1]->beta);
+      else
+        sae->encoders[i]->backward(sae->encoders[i-1]->outputs, sae->encoders[i+1]->beta);
+    }
   }
   else  {
     machine->forward(data->inputs);
@@ -466,23 +480,27 @@ void StackedAutoencoderTrainer::TrainUnsupLayer()
   criterion = sup_criterion;
 }
 
-// TODO set outputer to do partial bprop
-void StackedAutoencoderTrainer::TrainOutputLayer(DataSet *supervised_train_data,
-                                                 MeasurerList *measurers)
+// Could gain in efficiency by setting the bottommost encoder to do partial bprop.
+void StackedAutoencoderTrainer::TrainSupervisedTopKLayers(DataSet *supervised_train_data,
+                                              MeasurerList *measurers,
+                                              int top_k_layers)
 {
-  // Inform user of the current stage
+  // Inform user
   std::stringstream ss;
-  ss << sae->name << " : training output layer.";
+  ss << sae->name << " : training top " << top_k_layers << " layers.";
   message(ss.str().c_str());
 
-  outputer_training = true;
+  assert( top_k_layers>0 && top_k_layers<=sae->n_hidden_layers+1 );
+
+  topK_training = true;
+  topKlayers = top_k_layers;
 
   machine = sae;
   criterion = sup_criterion;
 
   train(supervised_train_data, measurers);
 
-  outputer_training = false;
+  topK_training = false;
 }
 
 //--------------
@@ -634,7 +652,6 @@ void StackedAutoencoderTrainer::TrainSupUnsup(DataSet *supervised_train_data,
   criterion = sup_criterion;
 
 }
-
 
 void StackedAutoencoderTrainer::ProfileGradientsInitialize()
 {
