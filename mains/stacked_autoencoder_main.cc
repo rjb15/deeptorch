@@ -95,13 +95,19 @@ int main(int argc, char **argv)
   int flag_max_iter_uc;
   int flag_max_iter_ac;
   int flag_max_iter_sc;
-  int flag_max_iter_sc_topk;
-  int flag_top_k_layers;
   real flag_accuracy;
+
   real flag_lr_lwu;
   real flag_lr_unsup;
   real flag_lr_supunsup;
-  real flag_lr_sup;
+  real flag_lr_sup;         // fine-tune global lr
+  bool flag_finetuning_layer_specific;
+  real flag_lr_ft_layer0;   // fine-tune layer specific lrs
+  real flag_lr_ft_layer1;
+  real flag_lr_ft_layer2;
+  real flag_lr_ft_layer3;
+  real flag_lr_ft_layer4;
+
   real flag_lrate_decay;
   real flag_l1_decay;
   real flag_l2_decay;
@@ -131,6 +137,8 @@ int main(int argc, char **argv)
   int flag_pretrain_layer_2;
   int flag_pretrain_layer_3;
   int flag_pretrain_layer_4;
+
+  
 
   // Construct the command line
   CmdLine cmd;
@@ -171,13 +179,20 @@ int main(int argc, char **argv)
   cmd.addICmdOption("-max_iter_uc", &flag_max_iter_uc, 2, "max number of iterations with the unsupervised costs (2nd phase)", true);
   cmd.addICmdOption("-max_iter_ac", &flag_max_iter_ac, 2, "max number of iterations with all the costs (3rd phase)", true);
   cmd.addICmdOption("-max_iter_sc", &flag_max_iter_sc, 2, "max number of iterations with only supervised cost (4th phase)", true);
-  cmd.addICmdOption("-max_iter_sc_topk", &flag_max_iter_sc_topk,0, "max number of iterations with only supervised cost on top k layers (5th phase)", true);
-  cmd.addICmdOption("-top_k_layers", &flag_top_k_layers, 1, "Number of layers to fine-tune starting from top (during 5th phase)", true);
   cmd.addRCmdOption("-accuracy", &flag_accuracy, 1e-5, "end accuracy", true);
+
   cmd.addRCmdOption("-lr_lwu", &flag_lr_lwu, 1e-3, "learning rate layerwise unsup phase", true);
   cmd.addRCmdOption("-lr_unsup", &flag_lr_unsup, 1e-3, "learning rate unsup phase", true);
   cmd.addRCmdOption("-lr_supunsup", &flag_lr_supunsup, 1e-3, "learning rate sup unsup phase", true);
   cmd.addRCmdOption("-lr_sup", &flag_lr_sup, 1e-3, "learning rate sup phase", true);
+
+  cmd.addBCmdOption("-finetuning_layer_specific", &flag_finetuning_layer_specific, false, "if true, use the layer specific lrs for finetuning", true);
+  cmd.addRCmdOption("-lr_ft_layer0", &flag_lr_ft_layer0, 0., "fine tuning layer specific learning rate", true);
+  cmd.addRCmdOption("-lr_ft_layer1", &flag_lr_ft_layer1, 0., "fine tuning layer specific learning rate", true);
+  cmd.addRCmdOption("-lr_ft_layer2", &flag_lr_ft_layer2, 0., "fine tuning layer specific learning rate", true);
+  cmd.addRCmdOption("-lr_ft_layer3", &flag_lr_ft_layer3, 0., "fine tuning layer specific learning rate", true);
+  cmd.addRCmdOption("-lr_ft_layer4", &flag_lr_ft_layer4, 0., "fine tuning layer specific learning rate", true);
+
   cmd.addRCmdOption("-lrate_decay", &flag_lrate_decay, 0.0, "learning rate decay", true);
   cmd.addRCmdOption("-l1_decay", &flag_l1_decay, 0.0, "l1 weight decay", true);
   cmd.addRCmdOption("-l2_decay", &flag_l2_decay, 0.0, "l2 weight decay", true);
@@ -225,6 +240,12 @@ int main(int argc, char **argv)
   if (flag_init_from_binners && (flag_max_iter_lwu || flag_max_iter_uc || flag_max_iter_ac))
     error("flag_init_from_binners=true initializes weights before supervised training. There should be no prior phase!");
 
+  if (flag_n_layers > 4)  {
+    warning("Some functionality is not supported for more than 4 layers: selective pretraining and layer specific finetuning");
+    if (flag_finetuning_layer_specific)
+      error("layer specific finetuning not supported for more than 4 layers.");
+  }
+
   std::string str_train_data_file = flag_train_data_file;
   std::string str_valid_data_file = flag_valid_data_file;
   std::string str_test_data_file = flag_test_data_file;
@@ -249,11 +270,16 @@ int main(int argc, char **argv)
      << "-l2s=" << flag_l2_smoothing_decay
      << "-lwe=" << flag_max_iter_lwu 
      << "-ace=" << flag_max_iter_ac << "-sce=" << flag_max_iter_sc
-     << "-scetk" << flag_max_iter_sc_topk << "-tk" << flag_top_k_layers
-     << "-lwu=" << flag_lr_lwu 
-     << "-pre=" << flag_pretrain_layer_1  << flag_pretrain_layer_2 << flag_pretrain_layer_3 << flag_pretrain_layer_4 
-     << "-lru=" << flag_lr_unsup << "-lrsu=" << flag_lr_supunsup << "-lrs=" << flag_lr_sup
-     << "-dc=" << flag_lrate_decay << "-l1=" << flag_l1_decay
+     << "-lwu=" << flag_lr_lwu;
+  if (flag_selective_layerwise_pretraining)
+    ss << "-pre=" << flag_pretrain_layer_1  << flag_pretrain_layer_2 << flag_pretrain_layer_3 << flag_pretrain_layer_4;
+  ss << "-lru=" << flag_lr_unsup << "-lrsu=" << flag_lr_supunsup;
+  if (!flag_finetuning_layer_specific)
+    ss << "-lrs=" << flag_lr_sup;
+  else
+    ss << "-lrs=" << flag_lr_ft_layer0 << "-" << flag_lr_ft_layer1 << "-" 
+        << flag_lr_ft_layer2 << "-" << flag_lr_ft_layer3 << "-" << flag_lr_ft_layer4;
+  ss << "-dc=" << flag_lrate_decay << "-l1=" << flag_l1_decay
      << "-l2=" << flag_l2_decay << "-bdk=" << flag_bias_decay
      << "-uw=" << flag_unsup_weight
      << "-uto=" << flag_unsup_trains_outputer
@@ -486,6 +512,22 @@ int main(int argc, char **argv)
   if (flag_max_iter_sc) {
     csae_trainer.setROption("learning rate", flag_lr_sup);
     csae_trainer.setIOption("max iter", flag_max_iter_sc);
+
+    if (flag_finetuning_layer_specific) {
+      csae_trainer.is_finetuning = true;
+
+      real *tmp_lrs = (real*) allocator->alloc(sizeof(real)*5);
+      tmp_lrs[0] = flag_lr_ft_layer0;
+      tmp_lrs[1] = flag_lr_ft_layer1;
+      tmp_lrs[2] = flag_lr_ft_layer2;
+      tmp_lrs[3] = flag_lr_ft_layer3;
+      tmp_lrs[4] = flag_lr_ft_layer4;
+      
+      for (int i=0; i<flag_n_layers+1; i++)
+        csae_trainer.finetuning_learning_rates[i] = tmp_lrs[i];
+
+      allocator->free(tmp_lrs);
+    }
  
     if (flag_single_results_file) {
       resultsfile = InitResultsFile(allocator,expdir,"sup");
@@ -494,19 +536,6 @@ int main(int argc, char **argv)
 
     csae_trainer.train(&train_data, &csae_measurers);
   }
-
-   if (flag_max_iter_sc_topk) {
-    csae_trainer.setROption("learning rate", flag_lr_sup);
-    csae_trainer.setIOption("max iter", flag_max_iter_sc_topk);
- 
-    if (flag_single_results_file) {
-      resultsfile = InitResultsFile(allocator,expdir,"sup");
-      csae_trainer.resultsfile = resultsfile;
-    }
-
-    csae_trainer.TrainSupervisedTopKLayers(&train_data, &csae_measurers, flag_top_k_layers);
-  }
-
  
 
   // === Save model ===

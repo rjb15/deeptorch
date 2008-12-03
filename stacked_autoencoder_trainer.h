@@ -77,6 +77,9 @@ class StackedAutoencoderTrainer : public StochasticGradientPlus
     int layerwise_layer;
     bool topK_training;
     int topKlayers;
+    bool is_finetuning;
+
+    real *finetuning_learning_rates;
 
     // Gradient profiling
     bool profile_gradients;
@@ -108,6 +111,7 @@ class StackedAutoencoderTrainer : public StochasticGradientPlus
     virtual void IterInitialize();
     virtual void IterFinalize();
     virtual void fpropbprop(DataSet *data);
+    virtual void UpdateMachine(GradientMachine *gm, real current_learning_rate);
 
     virtual void TrainSelectiveUnsupLayerwise(int* pretrain_list);
     virtual void TrainSelectiveUnsup(int* pretrain_list, bool partial_backprop);
