@@ -58,12 +58,19 @@ StackedAutoencoderTrainer::StackedAutoencoderTrainer(StackedAutoencoder *machine
   unsup_measurers = NULL;
 
   criterions_weights = (real*) allocator->alloc(sizeof(real)*(sae->n_hidden_layers+1));
+  finetuning_learning_rates  = (real*) allocator->alloc(sizeof(real)*(sae->n_hidden_layers+1));
+  for (int i = 0; i < sae->n_hidden_layers + 1; i++)  {
+    criterions_weights[i] = 0.0;
+    finetuning_learning_rates[i] = 0.0;
+  }
 
   layerwise_training = false;
   layerwise_layer = 0;
   topK_training = false;
   topKlayers = 0;
-  
+
+  is_finetuning = false;
+ 
   // Gradient profiling
   profile_gradients = false;
 
@@ -276,6 +283,24 @@ void StackedAutoencoderTrainer::fpropbprop(DataSet *data)
     criterion->backward(machine->outputs, NULL);
     ProfileLocalGradMeasureExample(data);       // this does the backward!!
     //((GradientMachine *)machine)->backward(data->inputs, criterion->beta);
+  }
+}
+
+void StackedAutoencoderTrainer::UpdateMachine(GradientMachine *gm, real current_learning_rate)
+{
+  if (!is_finetuning)
+    StochasticGradientPlus::UpdateMachine(gm, current_learning_rate);
+  // We are fine-tuning. The machine is the sae and we want to apply a specific
+  // learning rate to each layer.
+  else  {
+    assert(gm == sae);
+
+    for (int i=0; i<sae->n_hidden_layers; i++)  {
+      if (finetuning_learning_rates[i] > 0.)
+        StochasticGradientPlus::UpdateMachine(sae->encoders[i], finetuning_learning_rates[i]);
+    }
+    if (finetuning_learning_rates[sae->n_hidden_layers] > 0.)
+      StochasticGradientPlus::UpdateMachine(sae->outputer, finetuning_learning_rates[sae->n_hidden_layers]);
   }
 }
 
