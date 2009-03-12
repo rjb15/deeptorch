@@ -15,8 +15,11 @@
 const char *help = "\
 gradient_covariance_full-eigen\n\
 \n\
-This program computes the full eigendecomposition of the covariance\n\
-of the gradients on a model's parameters.\n";
+This program loads a model and:\n\
+  - computes all the gradients on the dataset\n\
+  - computes the covariance of the gradients\n\
+  - performs the the full eigendecomposition of that covariance\n\
+  - saves the eigenvecs / eigenvals.\n";
 
 #include <string>
 #include <sstream>

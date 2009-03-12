@@ -95,7 +95,9 @@ void PcaEstimator::Observe(Vec *x)
   // of Xt (first rows).
   Vec new_g(G->ptr[row], row + 1);
   Mat *Xkt =  Xt->subMat(0,0,row,n_dim-1);
-  mxMatMulVec(Xkt, x, &new_g); 
+  mxMatMulVec(Xkt, &new_x, &new_g); 
+  //mxMatMulVec(Xkt, x, &new_g); 
+  //std::cout << "I think this is wrong: should multiply by new_x, not x" << std::endl;
   delete Xkt;
 
   // Now copy G(row,:) to G(:,row).
@@ -123,10 +125,15 @@ void PcaEstimator::Reevaluate()
   // TODO How to get only #n_eigen# elements?
   mxSymEig(G, V, d);
 
+  //for (int i=0; i<n_eigen; i++)
+  //  std::cout << d->ptr[i] << " ";
+  //std::cout << std::endl;
+
   // The eigen values and vectors are *NOT SORTED*. Furthermore, the vectors
   // are on the columns.
   // Find and sort the n_eigen first values and vectors using Dumb Sort
   for (int i=0; i<n_eigen; i++) {
+
     // Initialize the max search
     int max_index = i;
     real max_value = d->ptr[i];
@@ -151,12 +158,13 @@ void PcaEstimator::Reevaluate()
 
   // Convert the n_eigen first eigenvectors of the Gram matrix contained in V 
   // into *unnormalized* eigenvectors U of the covariance.
+  // wrt the eigen values, not the moving average
   Mat *Vk = V->subMat(0, 0, n_eigen+minibatch_index-1, n_eigen-1);
   mxTrMatMulMat(Vk, Xt, Ut);
   delete Vk;
 
   // Take into account the discount factor.
-  // Here, minibatch index is minibacth_size. We age everyone. Because of the 
+  // Here, minibatch index is minibatch_size. We age everyone. Because of the 
   // previous multiplications to make some observations "younger" we multiply
   // everyone by the same factor.
   // TODO VERIFY THIS!
@@ -193,6 +201,7 @@ void PcaEstimator::GetLeadingEigen(Vec *the_d, Mat *the_Vt)
 {
 
   // Copy the eigen values and normalize them by (1 - pow(gamma,real(t+1)))/(1 - gamma);
+  // ie wrt to the moving average, not wrt to the eigen values
   the_d->copy(d);
 
   real normalizer = (1.0 - pow(gamma, (real)n_observations)) /(1.0 - gamma);
@@ -202,6 +211,7 @@ void PcaEstimator::GetLeadingEigen(Vec *the_d, Mat *the_Vt)
     the_d->ptr[i] *= inv_normalizer;
 
   // Copy the unnormalized eigen vectors and normalize them
+  // wrt to the eigen values!
   the_Vt->copy(Ut);
 
   // Normalize
