@@ -15,8 +15,9 @@
 const char *help = "\
 gradient_covariance_estimator\n\
 \n\
-This program estimates the leading (largest) eigen values-vectors of the covariance\n\
-of the gradients. To do so, we use the pca_estimator on the gradients.\n";
+This program loads a model and some data, then it: estimates the leading\n\
+(largest) eigen values-vectors of the covariance of the gradients using\n\
+the pca_estimator on the gradients.\n";
 
 #include <string>
 #include <sstream>

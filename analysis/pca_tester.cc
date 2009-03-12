@@ -91,8 +91,13 @@ int main(int argc, char **argv)
 
   the_estimator.GetLeadingEigen(&eigenvals, &eigenvecs);
 
-  for (int i=0; i<eigenvals.n; i++)
+  for (int i=0; i<eigenvals.n; i++) {
     std::cout << eigenvals.ptr[i] << std::endl;
+    for (int j=0; j<10; j++) {
+      std::cout << eigenvecs.ptr[i][j] << " ";
+    }
+    std::cout << std::endl;
+  }
 
   // -----
   // A small test of mxSymEig...
