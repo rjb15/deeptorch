@@ -1,6 +1,8 @@
 #summary How to install deeptorch on your computer
 #labels Phase-Deploy
 
+*10/30/2009 It is necessary to use the most up to date version of the code (ie by checking it out through svn).*
+
 = If you have never used Torch3 =
 
   * Download the [http://deeptorch.googlecode.com/files/Torch3_and_deeptorch_0.1_release.tar.gz archive] containing Torch3 and deeptorch source code.
