@@ -1,7 +1,10 @@
 #summary How to install deeptorch on your computer
 #labels Phase-Deploy
 
-*10/30/2009 It is necessary to use the most up to date version of the code (ie by checking it out through svn).*
+*10/30/2009 - The current bundled versions segfault! It is necessary to: 
+1) use the most up to date version of the code (ie by checking it out through svn).
+2) add 'deeptorch/analysis' in the list of packages in the file Torch3/Linux.cfg
+*
 
 = If you have never used Torch3 =
 
